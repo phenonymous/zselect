@@ -4,6 +4,22 @@
 		"selected_items":
 		[
 			[
+				"zselect",
+				"zselect_view\tabc"
+			],
+			[
+				"_zsel",
+				"_zselect-choices\tabc"
+			],
+			[
+				"zsele",
+				"zselect_elmnts\tabc"
+			],
+			[
+				"zsel",
+				"zselect_single=single\tabc"
+			],
+			[
 				"zselec",
 				"zselect_main\tabc"
 			],
@@ -12,16 +28,8 @@
 				"zselect_main\tabc"
 			],
 			[
-				"zsel",
-				"zselect_highlight\tabc"
-			],
-			[
 				"select",
 				"selected\tabc"
-			],
-			[
-				"zselect",
-				"zselect_highlight\tabc"
 			],
 			[
 				"unf",
@@ -183,7 +191,7 @@
 			"file": "candidates/zselect_zle",
 			"settings":
 			{
-				"buffer_size": 5271,
+				"buffer_size": 7270,
 				"encoding": "UTF-8",
 				"line_ending": "Unix"
 			}
@@ -192,30 +200,9 @@
 			"file": "zselect",
 			"settings":
 			{
-				"buffer_size": 5271,
+				"buffer_size": 7270,
 				"encoding": "UTF-8",
 				"line_ending": "Unix"
-			}
-		},
-		{
-			"contents": "#!/sbin/sh\n#\n##############################################################\n# File name       : installer.sh\n#\n# Description     : Main installation script for BiTGApps\n#\n# Build Date      : Friday March 15 11:36:43 IST 2019\n#\n# Updated on      : Saturday November 30 11:23:12 IST 2019\n#\n# GitHub          : TheHitMan7 <krtik.vrma@gmail.com>\n#\n# BiTGApps Author : TheHitMan @ xda-developers\n#\n# Copyright       : Copyright (C) 2019 TheHitMan7 (Kartik Verma)\n#\n# License         : SPDX-License-Identifier: GPL-3.0-or-later\n#\n# The BiTGApps scripts are free software: you can redistribute it and/or modify\n# it under the terms of the GNU General Public License as published by\n# the Free Software Foundation, either version 3 of the License, or\n# (at your option) any later version.\n#\n# These scripts are distributed in the hope that it will be useful,\n# but WITHOUT ANY WARRANTY; without even the implied warranty of\n# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the\n# GNU General Public License for more details.\n##############################################################\n\n# Import OUTFD function\nui_print() {\n  echo -n -e \"ui_print $1\\n\" >> /proc/self/fd/$OUTFD\n  echo -n -e \"ui_print\\n\" >> /proc/self/fd/$OUTFD\n}\n\n# Unset predefined environmental variable\nrecovery_actions() {\n  OLD_LD_LIB=$LD_LIBRARY_PATH\n  OLD_LD_PRE=$LD_PRELOAD\n  OLD_LD_CFG=$LD_CONFIG_FILE\n  unset LD_LIBRARY_PATH\n  unset LD_PRELOAD\n  unset LD_CONFIG_FILE\n}\n\n# Restore predefined environmental variable\nrecovery_cleanup() {\n  [ -z $OLD_LD_LIB ] || export LD_LIBRARY_PATH=$OLD_LD_LIB\n  [ -z $OLD_LD_PRE ] || export LD_PRELOAD=$OLD_LD_PRE\n  [ -z $OLD_LD_CFG ] || export LD_CONFIG_FILE=$OLD_LD_CFG\n}\n\n# selinux status\nselinux_variable() {\n  getenforce >> /cache/bitgapps/selinux.log;\n}\n\nif [ -n \"$(cat /etc/fstab | grep /system_root)\" ];\nthen\n  SYSTEM=/system_root/system\nelse\n  SYSTEM=/system\nfi;\n\n# Only support vendor that is outside the system or symlinked in root\nvendor_fallback() {\n  if [ -f /vendor/build.prop ];\n    then\n    device_vendorpartition=true\n    VENDOR=/vendor\n  else\n    device_vendorpartition=false\n  fi;\n}\n\nPROPFILES=\"$SYSTEM/build.prop /sdcard/bitgapps-config.txt\";\n\nget_file_prop() {\n  grep -m1 \"^$2=\" \"$1\" | cut -d= -f2\n}\n\nget_prop() {\n  #check known .prop files using get_file_prop\n  for f in $PROPFILES; do\n    if [ -e \"$f\" ]; then\n      prop=\"$(get_file_prop \"$f\" \"$1\")\"\n      if [ -n \"$prop\" ]; then\n        break #if an entry has been found, break out of the loop\n      fi;\n    fi;\n  done\n  #if prop is still empty; try to use recovery's built-in getprop method; otherwise output current result\n  if [ -z \"$prop\" ]; then\n    getprop \"$1\" | cut -c1-\n  else\n    printf \"$prop\"\n  fi;\n}\n\n# insert_line <file> <if search string> <before|after> <line match string> <inserted line>\ninsert_line() {\n  local offset line;\n  if ! grep -q \"$2\" $1; then\n    case $3 in\n      before) offset=0;;\n      after) offset=1;;\n    esac;\n    line=$((`grep -n \"$4\" $1 | head -n1 | cut -d: -f1` + offset));\n    if [ -f $1 -a \"$line\" ] && [ \"$(wc -l $1 | cut -d\\  -f1)\" -lt \"$line\" ]; then\n      echo \"$5\" >> $1;\n    else\n      sed -i \"${line}s;^;${5}\\n;\" $1;\n    fi;\n  fi;\n}\n\n# replace_line <file> <line replace string> <replacement line>\nreplace_line() {\n  if grep -q \"$2\" $1; then\n    local line=$(grep -n \"$2\" $1 | head -n1 | cut -d: -f1);\n    sed -i \"${line}s;.*;${3};\" $1;\n  fi;\n}\n\n# remove_line <file> <line match string>\nremove_line() {\n  if grep -q \"$2\" $1; then\n    local line=$(grep -n \"$2\" $1 | head -n1 | cut -d: -f1);\n    sed -i \"${line}d\" $1;\n  fi;\n}\n\ngrep_cmdline() {\n  local REGEX=\"s/^$1=//p\"\n  cat /proc/cmdline | tr '[:space:]' '\\n' | sed -n \"$REGEX\" 2>/dev/null;\n}\n\n# Database optimization using sqlite tool\ndatabase_opt() {\n  for i in `find /d* -iname \"*.db\"`; do\n    # Running VACUUM\n    $SQLITE_TOOL $i 'VACUUM;';\n    resVac=$?\n    if [ $resVac == 0 ]; then\n      resVac=\"SUCCESS\";\n    else\n      resVac=\"ERRCODE-$resVac\";\n    fi;\n    # Running INDEX\n    $SQLITE_TOOL $i 'REINDEX;';\n    resIndex=$?\n    if [ $resIndex == 0 ]; then\n      resIndex=\"SUCCESS\";\n    else\n      resIndex=\"ERRCODE-$resIndex\";\n    fi;\n    echo \"Database $i:  VACUUM=$resVac  REINDEX=$resIndex\" >> $SQLITE_LOG;\n  done\n}\n\n# APK optimization using zipalign tool\napk_opt() {\n  $ZIPALIGN_TOOL -p -v 4 $SYSTEM_APP/FaceLock/FaceLock.apk $ZIPALIGN_OUTFILE/FaceLock.apk >> $ZIPALIGN_LOG;\n  $ZIPALIGN_TOOL -p -v 4 $SYSTEM_APP/GoogleCalendarSyncAdapter/GoogleCalendarSyncAdapter.apk $ZIPALIGN_OUTFILE/GoogleCalendarSyncAdapter.apk >> $ZIPALIGN_LOG;\n  $ZIPALIGN_TOOL -p -v 4 $SYSTEM_APP/GoogleContactsSyncAdapter/GoogleContactsSyncAdapter.apk $ZIPALIGN_OUTFILE/GoogleContactsSyncAdapter.apk >> $ZIPALIGN_LOG;\n  $ZIPALIGN_TOOL -p -v 4 $SYSTEM_APP/GoogleExtShared/GoogleExtShared.apk $ZIPALIGN_OUTFILE/GoogleExtShared.apk >> $ZIPALIGN_LOG;\n  $ZIPALIGN_TOOL -p -v 4 $SYSTEM_APP/MarkupGoogle/MarkupGoogle.apk $ZIPALIGN_OUTFILE/MarkupGoogle.apk >> $ZIPALIGN_LOG;\n  $ZIPALIGN_TOOL -p -v 4 $SYSTEM_APP/SoundPickerPrebuilt/SoundPickerPrebuilt.apk $ZIPALIGN_OUTFILE/SoundPickerPrebuilt.apk >> $ZIPALIGN_LOG;\n  $ZIPALIGN_TOOL -p -v 4 $SYSTEM_PRIV_APP/CarrierSetup/CarrierSetup.apk $ZIPALIGN_OUTFILE/CarrierSetup.apk >> $ZIPALIGN_LOG;\n  $ZIPALIGN_TOOL -p -v 4 $SYSTEM_PRIV_APP/ConfigUpdater/ConfigUpdater.apk $ZIPALIGN_OUTFILE/ConfigUpdater.apk >> $ZIPALIGN_LOG;\n  $ZIPALIGN_TOOL -p -v 4 $SYSTEM_PRIV_APP/GmsCoreSetupPrebuilt/GmsCoreSetupPrebuilt.apk $ZIPALIGN_OUTFILE/GmsCoreSetupPrebuilt.apk >> $ZIPALIGN_LOG;\n  $ZIPALIGN_TOOL -p -v 4 $SYSTEM_PRIV_APP/GoogleExtServices/GoogleExtServices.apk $ZIPALIGN_OUTFILE/GoogleExtServices.apk >> $ZIPALIGN_LOG;\n  $ZIPALIGN_TOOL -p -v 4 $SYSTEM_PRIV_APP/GoogleServicesFramework/GoogleServicesFramework.apk $ZIPALIGN_OUTFILE/GoogleServicesFramework.apk >> $ZIPALIGN_LOG;\n  $ZIPALIGN_TOOL -p -v 4 $SYSTEM_PRIV_APP/Phonesky/Phonesky.apk $ZIPALIGN_OUTFILE/Phonesky.apk >> $ZIPALIGN_LOG;\n  $ZIPALIGN_TOOL -p -v 4 $SYSTEM_PRIV_APP/PrebuiltGmsCorePi/PrebuiltGmsCorePi.apk $ZIPALIGN_OUTFILE/PrebuiltGmsCorePi.apk >> $ZIPALIGN_LOG;\n}\n\npre_opt() {\n  rm -rf $SYSTEM_APP/FaceLock/FaceLock.apk\n  rm -rf $SYSTEM_APP/GoogleCalendarSyncAdapter/GoogleCalendarSyncAdapter.apk\n  rm -rf $SYSTEM_APP/GoogleContactsSyncAdapter/GoogleContactsSyncAdapter.apk\n  rm -rf $SYSTEM_APP/GoogleExtShared/GoogleExtShared.apk\n  rm -rf $SYSTEM_APP/MarkupGoogle/MarkupGoogle.apk\n  rm -rf $SYSTEM_APP/SoundPickerPrebuilt/SoundPickerPrebuilt.apk\n  rm -rf $SYSTEM_PRIV_APP/CarrierSetup/CarrierSetup.apk\n  rm -rf $SYSTEM_PRIV_APP/ConfigUpdater/ConfigUpdater.apk\n  rm -rf $SYSTEM_PRIV_APP/GmsCoreSetupPrebuilt/GmsCoreSetupPrebuilt.apk\n  rm -rf $SYSTEM_PRIV_APP/GoogleExtServices/GoogleExtServices.apk\n  rm -rf $SYSTEM_PRIV_APP/GoogleServicesFramework/GoogleServicesFramework.apk\n  rm -rf $SYSTEM_PRIV_APP/Phonesky/Phonesky.apk\n  rm -rf $SYSTEM_PRIV_APP/PrebuiltGmsCorePi/PrebuiltGmsCorePi.apk\n}\n\nadd_opt() {\n  cp -f $ZIPALIGN_OUTFILE/FaceLock.apk $SYSTEM_APP/FaceLock/FaceLock.apk\n  cp -f $ZIPALIGN_OUTFILE/GoogleCalendarSyncAdapter.apk $SYSTEM_APP/GoogleCalendarSyncAdapter/GoogleCalendarSyncAdapter.apk\n  cp -f $ZIPALIGN_OUTFILE/GoogleContactsSyncAdapter.apk $SYSTEM_APP/GoogleContactsSyncAdapter/GoogleContactsSyncAdapter.apk\n  cp -f $ZIPALIGN_OUTFILE/GoogleExtShared.apk $SYSTEM_APP/GoogleExtShared/GoogleExtShared.apk\n  cp -f $ZIPALIGN_OUTFILE/MarkupGoogle.apk $SYSTEM_APP/MarkupGoogle/MarkupGoogle.apk\n  cp -f $ZIPALIGN_OUTFILE/SoundPickerPrebuilt.apk $SYSTEM_APP/SoundPickerPrebuilt/SoundPickerPrebuilt.apk\n  cp -f $ZIPALIGN_OUTFILE/CarrierSetup.apk $SYSTEM_PRIV_APP/CarrierSetup/CarrierSetup.apk\n  cp -f $ZIPALIGN_OUTFILE/ConfigUpdater.apk $SYSTEM_PRIV_APP/ConfigUpdater/ConfigUpdater.apk\n  cp -f $ZIPALIGN_OUTFILE/GmsCoreSetupPrebuilt.apk $SYSTEM_PRIV_APP/GmsCoreSetupPrebuilt/GmsCoreSetupPrebuilt.apk\n  cp -f $ZIPALIGN_OUTFILE/GoogleExtServices.apk $SYSTEM_PRIV_APP/GoogleExtServices/GoogleExtServices.apk\n  cp -f $ZIPALIGN_OUTFILE/GoogleServicesFramework.apk $SYSTEM_PRIV_APP/GoogleServicesFramework/GoogleServicesFramework.apk\n  cp -f $ZIPALIGN_OUTFILE/Phonesky.apk $SYSTEM_PRIV_APP/Phonesky/Phonesky.apk\n  cp -f $ZIPALIGN_OUTFILE/PrebuiltGmsCorePi.apk $SYSTEM_PRIV_APP/PrebuiltGmsCorePi/PrebuiltGmsCorePi.apk\n}\n\nperm_opt() {\n  chmod 0644 $SYSTEM_APP/FaceLock/FaceLock.apk\n  chmod 0644 $SYSTEM_APP/GoogleCalendarSyncAdapter/GoogleCalendarSyncAdapter.apk\n  chmod 0644 $SYSTEM_APP/GoogleContactsSyncAdapter/GoogleContactsSyncAdapter.apk\n  chmod 0644 $SYSTEM_APP/GoogleExtShared/GoogleExtShared.apk\n  chmod 0644 $SYSTEM_APP/MarkupGoogle/MarkupGoogle.apk\n  chmod 0644 $SYSTEM_APP/SoundPickerPrebuilt/SoundPickerPrebuilt.apk\n  chmod 0644 $SYSTEM_PRIV_APP/CarrierSetup/CarrierSetup.apk\n  chmod 0644 $SYSTEM_PRIV_APP/ConfigUpdater/ConfigUpdater.apk\n  chmod 0644 $SYSTEM_PRIV_APP/GmsCoreSetupPrebuilt/GmsCoreSetupPrebuilt.apk\n  chmod 0644 $SYSTEM_PRIV_APP/GoogleExtServices/GoogleExtServices.apk\n  chmod 0644 $SYSTEM_PRIV_APP/GoogleServicesFramework/GoogleServicesFramework.apk\n  chmod 0644 $SYSTEM_PRIV_APP/Phonesky/Phonesky.apk\n  chmod 0644 $SYSTEM_PRIV_APP/PrebuiltGmsCorePi/PrebuiltGmsCorePi.apk\n}\n# end opt method\n\n# Set config file property\nsupported_config=\"$(get_prop \"ro.config.setupwizard\")\";\nsupported_target=\"true\";\n\n# Set privileged app Whitelist property\nandroid_flag=\"$(get_prop \"ro.control_privapp_permissions\")\";\nsupported_flag_enforce=\"enforce\";\nsupported_flag_disable=\"disable\";\nsupported_flag_log=\"log\";\nPROPFLAG=\"ro.control_privapp_permissions\";\n\n# Set partition and boot slot property\nsystem_as_root=`getprop ro.build.system_root_image`\nactive_slot=`getprop ro.boot.slot_suffix`\n\n# Set default packages\nZIP=\"\n  zip/core/priv_app_CarrierSetup.tar.gz\n  zip/core/priv_app_ConfigUpdater.tar.gz\n  zip/core/priv_app_GmsCoreSetupPrebuilt.tar.gz\n  zip/core/priv_app_GoogleExtServices.tar.gz\n  zip/core/priv_app_GoogleServicesFramework.tar.gz\n  zip/core/priv_app_Phonesky.tar.gz\n  zip/core/priv_app_PrebuiltGmsCorePi.tar.gz\n  zip/sys/sys_app_FaceLock.tar.gz\n  zip/sys/sys_app_GoogleCalendarSyncAdapter.tar.gz\n  zip/sys/sys_app_GoogleContactsSyncAdapter.tar.gz\n  zip/sys/sys_app_GoogleExtShared.tar.gz\n  zip/sys/sys_app_MarkupGoogle.tar.gz\n  zip/sys/sys_app_SoundPickerPrebuilt.tar.gz\n  zip/sys_addon.tar.gz\n  zip/sys_Config_Permission.tar.gz\n  zip/sys_Default_Permission.tar.gz\n  zip/sys_Framework.tar.gz\n  zip/sys_Lib.tar.gz\n  zip/sys_Lib64.tar.gz\n  zip/sys_Permissions.tar.gz\n  zip/sys_Pref_Permission.tar.gz\"\n\n# Set config dependent packages\nZIP_INITIAL=\"\n  zip/core/priv_app_GoogleBackupTransport.tar.gz\n  zip/core/priv_app_GoogleRestore.tar.gz\n  zip/core/priv_app_SetupWizard.tar.gz\"\n\n# Unpack system files\nunpack_zip() {\n  for f in $ZIP; do\n    unzip -o \"$ZIPFILE\" \"$f\" -d \"$TMP\";\n  done\n}\n\n# Unpack system files using config property\nunpack_zip_initial() {\n  for f in $ZIP_INITIAL; do\n    unzip -o \"$ZIPFILE\" \"$f\" -d \"$TMP\";\n  done\n}\n\n# Check whether config file present in device or not\nget_config() {\n  if [ -f /sdcard/bitgapps-config.txt ]; then\n    build_config=true\n  else\n    build_config=false\n  fi;\n}\n\n# Unpack config dependent packages\nconfig_install() {\n  if [ \"$supported_config\" = \"$supported_target\" ]; then\n    unpack_zip_initial;\n    # Remove SetupWizard components\n    pre_installed_initial() {\n      rm -rf $SYSTEM/product/app/ManagedProvisioning\n      rm -rf $SYSTEM/product/app/Provision\n      rm -rf $SYSTEM/product/priv-app/ManagedProvisioning\n      rm -rf $SYSTEM/product/priv-app/Provision\n      rm -rf $SYSTEM_APP/ManagedProvisioning\n      rm -rf $SYSTEM_APP/Provision\n      rm -rf $SYSTEM_PRIV_APP/GoogleBackupTransport\n      rm -rf $SYSTEM_PRIV_APP/GoogleRestore\n      rm -rf $SYSTEM_PRIV_APP/ManagedProvisioning\n      rm -rf $SYSTEM_PRIV_APP/Provision\n      rm -rf $SYSTEM_PRIV_APP/SetupWizard\n    }\n    # Unpack SetupWizard components\n    extract_app_initial() {\n      tar tvf $ZIP_FILE/core/priv_app_GoogleBackupTransport.tar.gz >> $config_log\n      tar tvf $ZIP_FILE/core/priv_app_GoogleRestore.tar.gz >> $config_log\n      tar tvf $ZIP_FILE/core/priv_app_SetupWizard.tar.gz >> $config_log\n      tar -xz -f $ZIP_FILE/core/priv_app_GoogleBackupTransport.tar.gz -C $TMP_PRIV_SETUP\n      tar -xz -f $ZIP_FILE/core/priv_app_GoogleRestore.tar.gz -C $TMP_PRIV_SETUP\n      tar -xz -f $ZIP_FILE/core/priv_app_SetupWizard.tar.gz -C $TMP_PRIV_SETUP\n      send_sparse_12;\n    }\n    # Selinux context for SetupWizard components\n    selinux_context_sp2_initial() {\n      chcon -h u:object_r:system_file:s0 \"$SYSTEM_PRIV_APP/GoogleBackupTransport\";\n      chcon -h u:object_r:system_file:s0 \"$SYSTEM_PRIV_APP/GoogleRestore\";\n      chcon -h u:object_r:system_file:s0 \"$SYSTEM_PRIV_APP/SetupWizard\";\n      chcon -h u:object_r:system_file:s0 \"$SYSTEM_PRIV_APP/GoogleBackupTransport/GoogleBackupTransport.apk\";\n      chcon -h u:object_r:system_file:s0 \"$SYSTEM_PRIV_APP/GoogleRestore/GoogleRestore.apk\";\n      chcon -h u:object_r:system_file:s0 \"$SYSTEM_PRIV_APP/SetupWizard/SetupWizard.apk\";\n    }\n    # SetupWizard components optimization using zipalign tool\n    apk_opt_initial() {\n      $ZIPALIGN_TOOL -p -v 4 $SYSTEM_PRIV_APP/GoogleBackupTransport/GoogleBackupTransport.apk $ZIPALIGN_OUTFILE/GoogleBackupTransport.apk >> $ZIPALIGN_LOG;\n      $ZIPALIGN_TOOL -p -v 4 $SYSTEM_PRIV_APP/GoogleRestore/GoogleRestore.apk $ZIPALIGN_OUTFILE/GoogleRestore.apk >> $ZIPALIGN_LOG;\n      $ZIPALIGN_TOOL -p -v 4 $SYSTEM_PRIV_APP/SetupWizard/SetupWizard.apk $ZIPALIGN_OUTFILE/SetupWizard.apk >> $ZIPALIGN_LOG;\n    }\n    pre_opt_initial() {\n      rm -rf $SYSTEM_PRIV_APP/GoogleBackupTransport/GoogleBackupTransport.apk\n      rm -rf $SYSTEM_PRIV_APP/GoogleRestore/GoogleRestore.apk\n      rm -rf $SYSTEM_PRIV_APP/SetupWizard/SetupWizard.apk\n    }\n    add_opt_initial() {\n      cp -f $ZIPALIGN_OUTFILE/GoogleBackupTransport.apk $SYSTEM_PRIV_APP/GoogleBackupTransport/GoogleBackupTransport.apk\n      cp -f $ZIPALIGN_OUTFILE/GoogleRestore.apk $SYSTEM_PRIV_APP/GoogleRestore/GoogleRestore.apk\n      cp -f $ZIPALIGN_OUTFILE/SetupWizard.apk $SYSTEM_PRIV_APP/SetupWizard/SetupWizard.apk\n    }\n    perm_opt_initial() {\n      chmod 0644 $SYSTEM_PRIV_APP/GoogleBackupTransport/GoogleBackupTransport.apk\n      chmod 0644 $SYSTEM_PRIV_APP/GoogleRestore/GoogleRestore.apk\n      chmod 0644 $SYSTEM_PRIV_APP/SetupWizard/SetupWizard.apk\n    }\n    # end opt initial method\n\n    # Initiate SetupWizard components installation\n    on_config_install() {\n      pre_installed_initial;\n      extract_app_initial;\n      selinux_context_sp2_initial;\n      apk_opt_initial;\n      pre_opt_initial;\n      add_opt_initial;\n      perm_opt_initial;\n      # Re-run selinux function for optimized APKs\n      selinux_context_sp2_initial;\n      # end selinux function\n    }\n    on_config_install;\n  else\n    build_configproperty=false\n  fi;\n}\n\n# Detect A/B partition layout https://source.android.com/devices/tech/ota/ab_updates\n# and system-as-root https://source.android.com/devices/bootloader/system-as-root\nset_mount() {\n  if [ \"$system_as_root\" == \"true\" ]; then\n    if [ ! -z \"$active_slot\" ]; then\n      device_abpartition=true\n      SYSTEM_MOUNT=/system\n    else\n      device_abpartition=false\n      SYSTEM_MOUNT=/system_root\n    fi;\n  else\n    device_abpartition=false\n    SYSTEM_MOUNT=/system\n  fi;\n}\n\nandroidboot=\"$TMP/boot_slot.log\"\n# Check A/B slot\nboot_slot() {\n  SLOT=`grep_cmdline androidboot.slot_suffix`\n  if [ -z $SLOT ]; then\n    SLOT=`grep_cmdline androidboot.slot`\n    [ -z $SLOT ] || SLOT=_${SLOT}\n  fi\n  [ -z $SLOT ] || echo \"Current boot slot: $SLOT\" >> $androidboot\n}\n\nearly_mount() {\n  if mountpoint /system; then umount /system; fi;\n  if mountpoint /system_root; then umount /system_root; fi;\n  if mountpoint /vendor; then umount /vendor; fi;\n}\n\n# Mount partition\nmount_part() {\n  mounts=\"\"\n  for p in \"/cache\" \"/data\" \"$SYSTEM_MOUNT\" \"/vendor\"; do\n    if [ -d \"$p\" ] && grep -q \"$p\" \"/etc/fstab\" && ! mountpoint -q \"$p\"; then\n      mounts=\"$mounts $p\"\n    fi;\n  done\n  for m in $mounts; do\n    mount -o rw \"$m\"\n  done\n}\n\n# Remount $SYSTEM_MOUNT, if previous mount failed\nremount_part() {\n  mount -o remount,rw $SYSTEM_MOUNT\n}\n\n# Remount /system to /system_root if we have system-as-root\non_SAR() {\n  if [ -f /system/init.rc ]; then\n    system_as_root=true\n    [ -L /system_root ] && rm -f /system_root\n    mkdir /system_root 2>/dev/null;\n    mount --move /system /system_root\n    mount -o bind /system_root/system /system\n  else\n    grep ' / ' /proc/mounts | grep -qv 'rootfs' || grep -q ' /system_root ' /proc/mounts \\\n    && system_as_root=true || system_as_root=false\n  fi;\n}\n\ncleanup() {\n  rm -rf /tmp/unzip\n  rm -rf /tmp/zip\n}\n\nclean_logs() {\n  rm -rf /cache/bitgapps\n}\n\n# Generate a separate log file on abort\non_install_failed() {\n  rm -rf /sdcard/bitgapps_debug_failed_logs.tar.gz\n  rm -rf /cache/bitgapps\n  mkdir /cache/bitgapps\n  cd /cache/bitgapps\n  cp -f $TMP/recovery.log /cache/bitgapps/recovery.log\n  selinux_variable;\n  cp -f $TMP/boot_slot.log /cache/bitgapps/boot_slot.log\n  pre_install;\n  cp -f $SYSTEM/build.prop /cache/bitgapps/build.prop\n  cp -f $VENDOR/build.prop /cache/bitgapps/build2.prop\n  cp -f /sdcard/bitgapps-config.txt /cache/bitgapps/bitgapps-config.txt\n  tar -cz -f \"$TMP/bitgapps_debug_failed_logs.tar.gz\" *\n  cp -f $TMP/bitgapps_debug_failed_logs.tar.gz /sdcard/bitgapps_debug_failed_logs.tar.gz\n  # Checkout log path\n  cd /\n}\n\n# log\non_install_complete() {\n  rm -rf /sdcard/bitgapps_debug_complete_logs.tar.gz\n  cd /cache/bitgapps\n  cp -f $TMP/recovery.log /cache/bitgapps/recovery.log\n  cp -f $TMP/boot_slot.log /cache/bitgapps/boot_slot.log\n  cp -f $SYSTEM/build.prop /cache/bitgapps/build.prop\n  cp -f $VENDOR/build.prop /cache/bitgapps/build2.prop\n  cp -f /sdcard/bitgapps-config.txt /cache/bitgapps/bitgapps-config.txt\n  tar -cz -f \"$TMP/bitgapps_debug_complete_logs.tar.gz\" *\n  cp -f $TMP/bitgapps_debug_complete_logs.tar.gz /sdcard/bitgapps_debug_complete_logs.tar.gz\n  # Checkout log path\n  cd /\n}\n\nunmount_all() {\n  ui_print \" \";\n  if [ \"$device_abpartition\" = \"true\" ]; then\n    mount -o ro $SYSTEM_MOUNT\n    mount -o ro $VENDOR\n  else\n    umount $SYSTEM_MOUNT\n    umount $VENDOR\n  fi\n}\n\non_install() {\n  selinux_variable;\n  on_install_complete;\n  clean_logs;\n  cleanup;\n  recovery_cleanup;\n  unmount_all;\n}\n\non_abort() {\n  ui_print \"$*\";\n  on_install_failed;\n  clean_logs;\n  cleanup;\n  recovery_cleanup;\n  unmount_all;\n  exit 1;\n}\n\n# Set package defaults\nTMP=\"/tmp\"\nZIP_FILE=\"/tmp/zip\"\n# Create temporary unzip directory\nmkdir /tmp/unzip\nchmod 0755 /tmp/unzip\n# Create temporary outfile directory\nmkdir /tmp/out\nchmod 0755 /tmp/out\n# Create temporary links\nUNZIP_DIR=\"/tmp/unzip\"\nTMP_ADDON=\"$UNZIP_DIR/tmp_addon\"\nTMP_SYS=\"$UNZIP_DIR/tmp_sys\"\nTMP_SYS_ROOT=\"$UNZIP_DIR/tmp_sys_root\"\nTMP_PRIV=\"$UNZIP_DIR/tmp_priv\"\nTMP_PRIV_ROOT=\"$UNZIP_DIR/tmp_priv_root\"\nTMP_PRIV_SETUP=\"$UNZIP_DIR/tmp_priv_setup\"\nTMP_LIB=\"$UNZIP_DIR/tmp_lib\"\nTMP_LIB64=\"$UNZIP_DIR/tmp_lib64\"\nTMP_FRAMEWORK=\"$UNZIP_DIR/tmp_framework\"\nTMP_CONFIG=\"$UNZIP_DIR/tmp_config\"\nTMP_DEFAULT_PERM=\"$UNZIP_DIR/tmp_default\"\nTMP_G_PERM=\"$UNZIP_DIR/tmp_perm\"\nTMP_G_PREF=\"$UNZIP_DIR/tmp_pref\"\nTMP_PERM_ROOT=\"$UNZIP_DIR/tmp_perm_root\"\nSYSTEM_APP=\"$SYSTEM/app\"\nSYSTEM_PRIV_APP=\"$SYSTEM/priv-app\"\nSYSTEM_LIB=\"$SYSTEM/lib\"\nSYSTEM_LIB64=\"$SYSTEM/lib64\"\nSYSTEM_ADDOND=\"$SYSTEM/addon.d\"\nSYSTEM_FRAMEWORK=\"$SYSTEM/framework\"\nSYSTEM_ETC_CONFIG=\"$SYSTEM/etc/sysconfig\"\nSYSTEM_ETC_DEFAULT=\"$SYSTEM/etc\"\nSYSTEM_ETC_PERM=\"$SYSTEM/etc/permissions\"\nSYSTEM_ETC_PREF=\"$SYSTEM/etc\"\n# Set logging\nLOG=\"/cache/bitgapps/installation.log\"\nconfig_log=\"/cache/bitgapps/config-installation.log\"\nwhitelist=\"/cache/bitgapps/enforce.log\";\nEXTRA_LOG=\"/cache/bitgapps/extra.log\"\nSQLITE_LOG=\"/cache/bitgapps/sqlite.log\"\nSQLITE_TOOL=\"/tmp/sqlite3\"\nZIPALIGN_LOG=\"/cache/bitgapps/zipalign.log\"\nZIPALIGN_TOOL=\"/tmp/zipalign\"\nZIPALIGN_OUTFILE=\"/tmp/out\"\nFILES=\"/cache/bitgapps/files.log\"\n\n# Create log dir\nlogd() {\n  mkdir /cache/bitgapps\n  chmod 0755 /cache/bitgapps\n}\n\n# Creating installation components\nservice_manager() {\n  echo \"-----------------------------------\" >> $LOG\n  echo \" --- BiTGApps Installation Log --- \" >> $LOG\n  echo \"             Start at              \" >> $LOG\n  echo \"        $( date +\"%m-%d-%Y %H:%M:%S\" )\" >> $LOG\n  echo \"-----------------------------------\" >> $LOG\n  echo \" \" >> $LOG\n  echo \"-----------------------------------\" >> $LOG\n  if [ -d /cache/bitgapps ]; then\n    echo \"- Log directory found in :\" /cache >> $LOG\n  else\n    echo \"- Log directory not found in :\" /cache >> $LOG\n  fi;\n  echo \"-----------------------------------\" >> $LOG\n  if [ -d \"$UNZIP_DIR\" ]; then\n    echo \"- Unzip directory found in :\" $TMP >> $LOG\n    echo \"- Creating components in :\" $TMP >> $LOG\n    mkdir $UNZIP_DIR/tmp_addon\n    mkdir $UNZIP_DIR/tmp_sys\n    mkdir $UNZIP_DIR/tmp_sys_root\n    mkdir $UNZIP_DIR/tmp_priv\n    mkdir $UNZIP_DIR/tmp_priv_root\n    mkdir $UNZIP_DIR/tmp_priv_setup\n    mkdir $UNZIP_DIR/tmp_lib\n    mkdir $UNZIP_DIR/tmp_lib64\n    mkdir $UNZIP_DIR/tmp_framework\n    mkdir $UNZIP_DIR/tmp_config\n    mkdir $UNZIP_DIR/tmp_default\n    mkdir $UNZIP_DIR/tmp_perm\n    mkdir $UNZIP_DIR/tmp_pref\n    mkdir $UNZIP_DIR/tmp_perm_root\n    chmod 0755 $UNZIP_DIR\n    chmod 0755 $UNZIP_DIR/tmp_addon\n    chmod 0755 $UNZIP_DIR/tmp_sys\n    chmod 0755 $UNZIP_DIR/tmp_sys_root\n    chmod 0755 $UNZIP_DIR/tmp_priv\n    chmod 0755 $UNZIP_DIR/tmp_priv_root\n    chmod 0755 $UNZIP_DIR/tmp_priv_setup\n    chmod 0755 $UNZIP_DIR/tmp_lib\n    chmod 0755 $UNZIP_DIR/tmp_lib64\n    chmod 0755 $UNZIP_DIR/tmp_framework\n    chmod 0755 $UNZIP_DIR/tmp_config\n    chmod 0755 $UNZIP_DIR/tmp_default\n    chmod 0755 $UNZIP_DIR/tmp_perm\n    chmod 0755 $UNZIP_DIR/tmp_pref\n    chmod 0755 $UNZIP_DIR/tmp_perm_root\n  else\n    echo \"- Unzip directory not found in :\" $TMP >> $LOG\n  fi;\n}\n\n# Removing pre-installed system files\npre_installed() {\n  rm -rf $SYSTEM_APP/FaceLock\n  rm -rf $SYSTEM_APP/GoogleCalendarSyncAdapter\n  rm -rf $SYSTEM_APP/GoogleContactsSyncAdapter\n  rm -rf $SYSTEM_APP/ExtShared\n  rm -rf $SYSTEM_APP/GoogleExtShared\n  rm -rf $SYSTEM_APP/MarkupGoogle\n  rm -rf $SYSTEM_APP/SoundPickerPrebuilt\n  rm -rf $SYSTEM_PRIV_APP/AndroidPlatformServices\n  rm -rf $SYSTEM_PRIV_APP/CarrierSetup\n  rm -rf $SYSTEM_PRIV_APP/ConfigUpdater\n  rm -rf $SYSTEM_PRIV_APP/GmsCoreSetupPrebuilt\n  rm -rf $SYSTEM_PRIV_APP/ExtServices\n  rm -rf $SYSTEM_PRIV_APP/GoogleExtServices\n  rm -rf $SYSTEM_PRIV_APP/GoogleServicesFramework\n  rm -rf $SYSTEM_PRIV_APP/Phonesky\n  rm -rf $SYSTEM_PRIV_APP/PrebuiltGmsCorePi\n  rm -rf $SYSTEM_FRAMEWORK/com.google.android.dialer.support.jar\n  rm -rf $SYSTEM_FRAMEWORK/com.google.android.maps.jar\n  rm -rf $SYSTEM_FRAMEWORK/com.google.android.media.effects.jar\n  rm -rf $SYSTEM_LIB/libfrsdk.so\n  rm -rf $SYSTEM_LIB64/libfacenet.so\n  rm -rf $SYSTEM_LIB64/libfilterpack_facedetect.so\n  rm -rf $SYSTEM_LIB64/libfrsdk.so\n  rm -rf $SYSTEM_LIB64/libjni_latinimegoogle.so\n  rm -rf $SYSTEM_LIB64/libsketchology_native.so\n  rm -rf $SYSTEM_ETC_CONFIG/dialer_experience.xml\n  rm -rf $SYSTEM_ETC_CONFIG/google.xml\n  rm -rf $SYSTEM_ETC_CONFIG/google_build.xml\n  rm -rf $SYSTEM_ETC_CONFIG/google_exclusives_enable.xml\n  rm -rf $SYSTEM_ETC_CONFIG/google-hiddenapi-package-whitelist.xml\n  rm -rf $SYSTEM_ETC_DEFAULT/default-permissions\n  rm -rf $SYSTEM_ETC_PERM/com.google.android.dialer.support.xml\n  rm -rf $SYSTEM_ETC_PERM/com.google.android.maps.xml\n  rm -rf $SYSTEM_ETC_PERM/com.google.android.media.effects.xml\n  rm -rf $SYSTEM_ETC_PERM/privapp-permissions-google.xml\n  rm -rf $SYSTEM_ETC_PREF/preferred-apps\n  rm -rf $SYSTEM_ADDOND/90bit_gapps.sh\n  rm -rf $SYSTEM/etc/g.prop\n  rm -rf $SYSTEM/xbin/pm.sh\n}\n\n# Unpack system files\nextract_app() {\n  echo \"-----------------------------------\" >> $LOG\n  echo \"- Unpack SYS-APP Files\" >> $LOG\n  tar tvf $ZIP_FILE/sys/sys_app_FaceLock.tar.gz >> $LOG\n  tar tvf $ZIP_FILE/sys/sys_app_GoogleCalendarSyncAdapter.tar.gz >> $LOG\n  tar tvf $ZIP_FILE/sys/sys_app_GoogleContactsSyncAdapter.tar.gz >> $LOG\n  tar tvf $ZIP_FILE/sys/sys_app_GoogleExtShared.tar.gz >> $LOG\n  tar tvf $ZIP_FILE/sys/sys_app_MarkupGoogle.tar.gz >> $LOG\n  tar tvf $ZIP_FILE/sys/sys_app_SoundPickerPrebuilt.tar.gz >> $LOG\n  tar -xz -f $ZIP_FILE/sys/sys_app_FaceLock.tar.gz -C $TMP_SYS\n  tar -xz -f $ZIP_FILE/sys/sys_app_GoogleCalendarSyncAdapter.tar.gz -C $TMP_SYS\n  tar -xz -f $ZIP_FILE/sys/sys_app_GoogleContactsSyncAdapter.tar.gz -C $TMP_SYS\n  tar -xz -f $ZIP_FILE/sys/sys_app_GoogleExtShared.tar.gz -C $TMP_SYS\n  tar -xz -f $ZIP_FILE/sys/sys_app_MarkupGoogle.tar.gz -C $TMP_SYS\n  tar -xz -f $ZIP_FILE/sys/sys_app_SoundPickerPrebuilt.tar.gz -C $TMP_SYS\n  echo \"- Done\" >> $LOG\n  echo \"-----------------------------------\" >> $LOG\n  echo \"- Unpack PRIV-APP Files\" >> $LOG\n  tar tvf $ZIP_FILE/core/priv_app_CarrierSetup.tar.gz >> $LOG\n  tar tvf $ZIP_FILE/core/priv_app_ConfigUpdater.tar.gz >> $LOG\n  tar tvf $ZIP_FILE/core/priv_app_GmsCoreSetupPrebuilt.tar.gz >> $LOG\n  tar tvf $ZIP_FILE/core/priv_app_GoogleExtServices.tar.gz >> $LOG\n  tar tvf $ZIP_FILE/core/priv_app_GoogleServicesFramework.tar.gz >> $LOG\n  tar tvf $ZIP_FILE/core/priv_app_Phonesky.tar.gz >> $LOG\n  tar tvf $ZIP_FILE/core/priv_app_PrebuiltGmsCorePi.tar.gz >> $LOG\n  tar -xz -f $ZIP_FILE/core/priv_app_CarrierSetup.tar.gz -C $TMP_PRIV\n  tar -xz -f $ZIP_FILE/core/priv_app_ConfigUpdater.tar.gz -C $TMP_PRIV\n  tar -xz -f $ZIP_FILE/core/priv_app_GmsCoreSetupPrebuilt.tar.gz -C $TMP_PRIV\n  tar -xz -f $ZIP_FILE/core/priv_app_GoogleExtServices.tar.gz -C $TMP_PRIV\n  tar -xz -f $ZIP_FILE/core/priv_app_GoogleServicesFramework.tar.gz -C $TMP_PRIV\n  tar -xz -f $ZIP_FILE/core/priv_app_Phonesky.tar.gz -C $TMP_PRIV\n  tar -xz -f $ZIP_FILE/core/priv_app_PrebuiltGmsCorePi.tar.gz -C $TMP_PRIV\n  echo \"- Done\" >> $LOG\n  echo \"-----------------------------------\" >> $LOG\n  echo \"- Unpack Framework Files\" >> $LOG\n  tar tvf $ZIP_FILE/sys_Framework.tar.gz >> $LOG\n  tar -xz -f $ZIP_FILE/sys_Framework.tar.gz -C $TMP_FRAMEWORK\n  echo \"- Done\" >> $LOG\n  echo \"-----------------------------------\" >> $LOG\n  echo \"- Unpack System Lib\" >> $LOG\n  tar tvf $ZIP_FILE/sys_Lib.tar.gz >> $LOG\n  tar -xz -f $ZIP_FILE/sys_Lib.tar.gz -C $TMP_LIB\n  echo \"- Done\" >> $LOG\n  echo \"-----------------------------------\" >> $LOG\n  echo \"- Unpack System Lib64\" >> $LOG\n  tar tvf $ZIP_FILE/sys_Lib64.tar.gz >> $LOG\n  tar -xz -f $ZIP_FILE/sys_Lib64.tar.gz -C $TMP_LIB64\n  echo \"- Done\" >> $LOG\n  echo \"-----------------------------------\" >> $LOG\n  echo \"- Unpack System Files\" >> $LOG\n  tar tvf $ZIP_FILE/sys_Config_Permission.tar.gz >> $LOG\n  tar tvf $ZIP_FILE/sys_Default_Permission.tar.gz >> $LOG\n  tar tvf $ZIP_FILE/sys_Permissions.tar.gz >> $LOG\n  tar tvf $ZIP_FILE/sys_Pref_Permission.tar.gz >> $LOG\n  tar -xz -f $ZIP_FILE/sys_Config_Permission.tar.gz -C $TMP_CONFIG\n  tar -xz -f $ZIP_FILE/sys_Default_Permission.tar.gz -C $TMP_DEFAULT_PERM\n  tar -xz -f $ZIP_FILE/sys_Permissions.tar.gz -C $TMP_G_PERM\n  tar -xz -f $ZIP_FILE/sys_Pref_Permission.tar.gz -C $TMP_G_PREF\n  echo \"- Done\" >> $LOG\n  echo \"-----------------------------------\" >> $LOG\n  echo \"- Unpack Boot Script\" >> $LOG\n  tar tvf $ZIP_FILE/sys_addon.tar.gz >> $LOG\n  tar -xz -f $ZIP_FILE/sys_addon.tar.gz -C $TMP_ADDON\n  echo \"- Done\" >> $LOG\n  echo \"-----------------------------------\" >> $LOG\n  echo \"- Installation Complete\" >> $LOG\n  echo \"-----------------------------------\" >> $LOG\n  echo \"Finish at $( date +\"%m-%d-%Y %H:%M:%S\" )\" >> $LOG\n  echo \"-----------------------------------\" >> $LOG\n}\n\n# Install packages in sparse format\nsend_sparse_1() {\n  file_list=\"$(find \"$TMP_SYS/\" -mindepth 1 -type f | cut -d/ -f5-)\"\n  dir_list=\"$(find \"$TMP_SYS/\" -mindepth 1 -type d | cut -d/ -f5-)\"\n  for file in $file_list; do\n      install -D \"$TMP_SYS/${file}\" \"$SYSTEM_APP/${file}\"\n      chmod 0644 \"$SYSTEM_APP/${file}\";\n  done\n  for dir in $dir_list; do\n      chmod 0755 \"$SYSTEM_APP/${dir}\";\n  done\n}\n\nsend_sparse_2() {\n  file_list=\"$(find \"$TMP_PRIV/\" -mindepth 1 -type f | cut -d/ -f5-)\"\n  dir_list=\"$(find \"$TMP_PRIV/\" -mindepth 1 -type d | cut -d/ -f5-)\"\n  for file in $file_list; do\n      install -D \"$TMP_PRIV/${file}\" \"$SYSTEM_PRIV_APP/${file}\"\n      chmod 0644 \"$SYSTEM_PRIV_APP/${file}\";\n  done\n  for dir in $dir_list; do\n      chmod 0755 \"$SYSTEM_PRIV_APP/${dir}\";\n  done\n}\n\nsend_sparse_3() {\n  file_list=\"$(find \"$TMP_FRAMEWORK/\" -mindepth 1 -type f | cut -d/ -f5-)\"\n  dir_list=\"$(find \"$TMP_FRAMEWORK/\" -mindepth 1 -type d | cut -d/ -f5-)\"\n  for file in $file_list; do\n      install -D \"$TMP_FRAMEWORK/${file}\" \"$SYSTEM_FRAMEWORK/${file}\"\n      chmod 0644 \"$SYSTEM_FRAMEWORK/${file}\";\n  done\n  for dir in $dir_list; do\n    chmod 0755 \"$SYSTEM_FRAMEWORK/${dir}\";\n  done\n}\n\nsend_sparse_4() {\n  file_list=\"$(find \"$TMP_LIB/\" -mindepth 1 -type f | cut -d/ -f5-)\"\n  dir_list=\"$(find \"$TMP_LIB/\" -mindepth 1 -type d | cut -d/ -f5-)\"\n  for file in $file_list; do\n      install -D \"$TMP_LIB/${file}\" \"$SYSTEM_LIB/${file}\"\n      chmod 0644 \"$SYSTEM_LIB/${file}\";\n  done\n  for dir in $dir_list; do\n    chmod 0755 \"$SYSTEM_LIB/${dir}\";\n  done\n}\n\nsend_sparse_5() {\n  file_list=\"$(find \"$TMP_LIB64/\" -mindepth 1 -type f | cut -d/ -f5-)\"\n  dir_list=\"$(find \"$TMP_LIB64/\" -mindepth 1 -type d | cut -d/ -f5-)\"\n  for file in $file_list; do\n      install -D \"$TMP_LIB64/${file}\" \"$SYSTEM_LIB64/${file}\"\n      chmod 0644 \"$SYSTEM_LIB64/${file}\";\n  done\n  for dir in $dir_list; do\n    chmod 0755 \"$SYSTEM_LIB64/${dir}\";\n  done\n}\n\nsend_sparse_6() {\n  file_list=\"$(find \"$TMP_CONFIG/\" -mindepth 1 -type f | cut -d/ -f5-)\"\n  dir_list=\"$(find \"$TMP_CONFIG/\" -mindepth 1 -type d | cut -d/ -f5-)\"\n  for file in $file_list; do\n      install -D \"$TMP_CONFIG/${file}\" \"$SYSTEM_ETC_CONFIG/${file}\"\n      chmod 0644 \"$SYSTEM_ETC_CONFIG/${file}\";\n  done\n  for dir in $dir_list; do\n    chmod 0755 \"$SYSTEM_ETC_CONFIG/${dir}\";\n  done\n}\n\nsend_sparse_7() {\n  file_list=\"$(find \"$TMP_DEFAULT_PERM/\" -mindepth 1 -type f | cut -d/ -f5-)\"\n  dir_list=\"$(find \"$TMP_DEFAULT_PERM/\" -mindepth 1 -type d | cut -d/ -f5-)\"\n  for file in $file_list; do\n      install -D \"$TMP_DEFAULT_PERM/${file}\" \"$SYSTEM_ETC_DEFAULT/${file}\"\n      chmod 0644 \"$SYSTEM_ETC_DEFAULT/${file}\";\n  done\n  for dir in $dir_list; do\n    chmod 0755 \"$SYSTEM_ETC_DEFAULT/${dir}\";\n  done\n}\n\nsend_sparse_8() {\n  file_list=\"$(find \"$TMP_G_PREF/\" -mindepth 1 -type f | cut -d/ -f5-)\"\n  dir_list=\"$(find \"$TMP_G_PREF/\" -mindepth 1 -type d | cut -d/ -f5-)\"\n  for file in $file_list; do\n      install -D \"$TMP_G_PREF/${file}\" \"$SYSTEM_ETC_PREF/${file}\"\n      chmod 0644 \"$SYSTEM_ETC_PREF/${file}\";\n  done\n  for dir in $dir_list; do\n    chmod 0755 \"$SYSTEM_ETC_PREF/${dir}\";\n  done\n}\n\nsend_sparse_9() {\n  file_list=\"$(find \"$TMP_G_PERM/\" -mindepth 1 -type f | cut -d/ -f5-)\"\n  dir_list=\"$(find \"$TMP_G_PERM/\" -mindepth 1 -type d | cut -d/ -f5-)\"\n  for file in $file_list; do\n      install -D \"$TMP_G_PERM/${file}\" \"$SYSTEM_ETC_PERM/${file}\"\n      chmod 0644 \"$SYSTEM_ETC_PERM/${file}\";\n  done\n  for dir in $dir_list; do\n    chmod 0755 \"$SYSTEM_ETC_PERM/${dir}\";\n  done\n}\n\nsend_sparse_10() {\n  cp -f $TMP/g.prop $SYSTEM/etc/g.prop\n  chmod 0644 $SYSTEM/etc/g.prop\n}\n\nsend_sparse_11() {\n  file_list=\"$(find \"$TMP_ADDON/\" -mindepth 1 -type f | cut -d/ -f5-)\"\n  dir_list=\"$(find \"$TMP_ADDON/\" -mindepth 1 -type d | cut -d/ -f5-)\"\n  for file in $file_list; do\n      install -D \"$TMP_ADDON/${file}\" \"$SYSTEM_ADDOND/${file}\"\n      chmod 0644 \"$SYSTEM_ADDOND/${file}\";\n  done\n  for dir in $dir_list; do\n    chmod 0755 \"$SYSTEM_ADDOND/${dir}\";\n  done\n}\n\nsend_sparse_12() {\n  file_list=\"$(find \"$TMP_PRIV_SETUP/\" -mindepth 1 -type f | cut -d/ -f5-)\"\n  dir_list=\"$(find \"$TMP_PRIV_SETUP/\" -mindepth 1 -type d | cut -d/ -f5-)\"\n  for file in $file_list; do\n      install -D \"$TMP_PRIV_SETUP/${file}\" \"$SYSTEM_PRIV_APP/${file}\"\n      chmod 0644 \"$SYSTEM_PRIV_APP/${file}\";\n  done\n  for dir in $dir_list; do\n      chmod 0755 \"$SYSTEM_PRIV_APP/${dir}\";\n  done\n}\n\n# end sparse method\n  \n# Set selinux context\nselinux_context_s1() {\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_APP/FaceLock\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_APP/GoogleCalendarSyncAdapter\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_APP/GoogleContactsSyncAdapter\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_APP/GoogleExtShared\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_APP/MarkupGoogle\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_APP/SoundPickerPrebuilt\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_APP/FaceLock/FaceLock.apk\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_APP/GoogleCalendarSyncAdapter/GoogleCalendarSyncAdapter.apk\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_APP/GoogleContactsSyncAdapter/GoogleContactsSyncAdapter.apk\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_APP/GoogleExtShared/GoogleExtShared.apk\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_APP/MarkupGoogle/MarkupGoogle.apk\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_APP/SoundPickerPrebuilt/SoundPickerPrebuilt.apk\";\n}\n\nselinux_context_sp2() {\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_PRIV_APP/CarrierSetup\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_PRIV_APP/ConfigUpdater\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_PRIV_APP/GmsCoreSetupPrebuilt\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_PRIV_APP/GoogleExtServices\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_PRIV_APP/GoogleServicesFramework\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_PRIV_APP/Phonesky\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_PRIV_APP/PrebuiltGmsCorePi\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_PRIV_APP/CarrierSetup/CarrierSetup.apk\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_PRIV_APP/ConfigUpdater/ConfigUpdater.apk\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_PRIV_APP/GmsCoreSetupPrebuilt/GmsCoreSetupPrebuilt.apk\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_PRIV_APP/GoogleExtServices/GoogleExtServices.apk\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_PRIV_APP/GoogleServicesFramework/GoogleServicesFramework.apk\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_PRIV_APP/Phonesky/Phonesky.apk\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_PRIV_APP/PrebuiltGmsCorePi/PrebuiltGmsCorePi.apk\";\n}\n\nselinux_context_sf3() {\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_FRAMEWORK/com.google.android.dialer.support.jar\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_FRAMEWORK/com.google.android.maps.jar\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_FRAMEWORK/com.google.android.media.effects.jar\";\n}\n\nselinux_context_sl4() {\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_LIB/libfilterpack_facedetect.so\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_LIB/libfrsdk.so\";\n}\n\nselinux_context_sl5() {\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_LIB64/libfacenet.so\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_LIB64/libfilterpack_facedetect.so\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_LIB64/libfrsdk.so\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_LIB64/libjni_latinimegoogle.so\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_LIB64/libsketchology_native.so\";\n}\n\nselinux_context_se6() {\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_ETC_DEFAULT/default-permissions\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_ETC_DEFAULT/default-permissions/default-permissions.xml\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_ETC_DEFAULT/default-permissions/opengapps-permissions.xml\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_ETC_PERM/com.google.android.dialer.support.xml\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_ETC_PERM/com.google.android.maps.xml\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_ETC_PERM/com.google.android.media.effects.xml\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_ETC_PERM/privapp-permissions-google.xml\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_ETC_PREF/preferred-apps\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_ETC_PREF/preferred-apps/google.xml\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_ETC_CONFIG/dialer_experience.xml\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_ETC_CONFIG/google.xml\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_ETC_CONFIG/google_build.xml\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_ETC_CONFIG/google_exclusives_enable.xml\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_ETC_CONFIG/google-hiddenapi-package-whitelist.xml\";\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM/etc/g.prop\";\n}\n\nselinux_context_sb7() {\n  chcon -h u:object_r:system_file:s0 \"$SYSTEM_ADDOND/90bit_gapps.sh\";\n}\n\nselinux_context_sxb8() {\n chcon -h u:object_r:system_file:s0 \"$SYSTEM/xbin/pm.sh\";\n}\n\n# end selinux method\n\n# Enable Google Assistant\nset_assistant() {\n  insert_line $SYSTEM/build.prop \"ro.opa.eligible_device=true\" after 'net.bt.name=Android' 'ro.opa.eligible_device=true';\n}\n\n# Force Battery Optimization for GMS Core and its components\nallow_force_opt() {\n cp -f $TMP/pm.sh $SYSTEM/xbin/pm.sh\n chmod 0755 $SYSTEM/xbin/pm.sh\n}\n\n# Remove Privileged App Whitelist property with flag enforce\nwhitelist_permission() {\n  if [ -f $SYSTEM/build.prop ]; then\n    grep -v \"$PROPFLAG\" $SYSTEM/build.prop > /tmp/build.prop\n    rm -rf $SYSTEM/build.prop\n    cp -f /tmp/build.prop $SYSTEM/build.prop\n    chmod 0600 $SYSTEM/build.prop\n    rm -rf /tmp/build.prop\n    insert_line $SYSTEM/build.prop \"ro.control_privapp_permissions=disable\" after 'DEVICE_PROVISIONED=1' 'ro.control_privapp_permissions=disable';\n  fi;\n  if [ -f /system_root/system/etc/prop.default ]; then\n    echo \"system_root: prop.default present in device\" >> $whitelist\n    grep -v \"$PROPFLAG\" /system_root/system/etc/prop.default > /tmp/prop.default\n    rm -rf /system_root/system/etc/prop.default\n    cp -f /tmp/prop.default /system_root/system/etc/prop.default\n    chmod 0600 /system_root/system/etc/prop.default\n    ln -sfnv /system_root/system/etc/prop.default /system_root/default.prop\n    rm -rf /tmp/prop.default\n    insert_line /system_root/system/etc/prop.default \"ro.control_privapp_permissions=disable\" after 'ro.allow.mock.location=0' 'ro.control_privapp_permissions=disable';\n  else\n    echo \"system_root: unable to find prop.default\" >> $whitelist\n  fi;\n  if [ -f $VENDOR/build.prop ]; then\n    grep -v \"$PROPFLAG\" $VENDOR/build.prop > /tmp/build.prop\n    rm -rf $VENDOR/build.prop\n    cp -f /tmp/build.prop $VENDOR/build.prop\n    chmod 0600 $VENDOR/build.prop\n    rm -rf /tmp/build.prop\n    insert_line $VENDOR/build.prop \"ro.control_privapp_permissions=disable\" after 'ro.carrier=unknown' 'ro.control_privapp_permissions=disable';\n  fi;\n}\n\nui_print \"Mount Partitions\";\n\n# These set of functions should be executed before any other install function\nfunction pre_install() {\n  early_mount;\n  set_mount;\n  boot_slot;\n  mount_part;\n  vendor_fallback;\n  remount_part;\n  on_SAR;\n}\npre_install;\n\nui_print \" \";\n\n# Set version check property\nandroid_sdk=\"$(get_prop \"ro.build.version.sdk\")\";\nsupported_sdk=\"28\";\nandroid_version=\"$(get_prop \"ro.build.version.release\")\";\nsupported_version=\"9\";\n\nui_print \"Checking Android SDK version\";\nif [ \"$android_sdk\" = \"$supported_sdk\" ]; then\n    ui_print \"$android_sdk\";\n    ui_print \" \";\nelse\n    ui_print \" \";\n    on_abort \"Unsupported Android SDK version. Aborting...\";\n    ui_print \" \";\nfi;\n\nui_print \"Checking Android version\";\nif [ \"$android_version\" = \"$supported_version\" ]; then\n    ui_print \"$android_version\";\n    ui_print \" \";\nelse\n    ui_print \" \";\n    on_abort \"Unsupported Android version. Aborting...\";\n    ui_print \" \";\nfi;\n\n# Check to make certain that user device matches the architecture\ndevice_architecture=\"$(get_prop \"ro.product.cpu.abilist\")\"\n# If the recommended field is empty, fall back to the deprecated one\nif [ -z \"$device_architecture\" ]; then\n  device_architecture=\"$(get_prop \"ro.product.cpu.abi\")\"\nfi\n\ncase \"$device_architecture\" in\n  *x86_64*) arch=\"x86_64\";;\n  *x86*) arch=\"x86\";;\n  *arm64*) arch=\"arm64\";;\n  *armeabi*) arch=\"arm\";;\n  *) arch=\"unknown\";;\nesac\n\nui_print \"Checking Android ARCH\";\nfor targetarch in arm64; do\n  if [ \"$arch\" = \"$targetarch\" ]; then\n    ui_print \"$arch\";\n    ui_print \" \";\n  else\n    ui_print \" \";\n    on_abort \"Unsupported Android ARCH. Aborting...\";\n    ui_print \" \";\n  fi;\ndone\n\nui_print \"Installing\";\n\n# Do not merge 'pre_install' functions here\n# Begin installation\nfunction post_install() {\n  clean_logs;\n  logd;\n  recovery_actions;\n  unpack_zip;\n  service_manager;\n  pre_installed;\n  extract_app;\n  send_sparse_1;\n  send_sparse_2;\n  send_sparse_3;\n  send_sparse_4;\n  send_sparse_5;\n  send_sparse_6;\n  send_sparse_7;\n  send_sparse_8;\n  send_sparse_9;\n  send_sparse_10;\n  send_sparse_11;\n  selinux_context_s1;\n  selinux_context_sp2;\n  selinux_context_sf3;\n  selinux_context_sl4;\n  selinux_context_sl5;\n  selinux_context_se6;\n  selinux_context_sb7;\n  config_install;\n  set_assistant;\n  allow_force_opt;\n  selinux_context_sxb8;\n  whitelist_permission;\n  database_opt;\n  apk_opt;\n  pre_opt;\n  add_opt;\n  perm_opt;\n  # Re-run selinux functions for optimized APKs\n  selinux_context_s1;\n  selinux_context_sp2;\n  # end selinux functions\n  on_install;\n  recovery_cleanup;\n}\npost_install; # end installation\n\n# end method",
-			"file": "/home/phen/.cache/.fr-3SjCyk/installer.sh",
-			"file_size": 40751,
-			"file_write_time": 128487422260000000,
-			"settings":
-			{
-				"buffer_size": 40751,
-				"line_ending": "Unix"
-			}
-		},
-		{
-			"contents": "\n * keychain 2.8.5 ~ http://www.funtoo.org\n * Starting gpg-agent...\n * Found existing ssh-agent: 3087\n * Known ssh key: /home/phen/.ssh/id_ecdsa\n * Known ssh key: /home/phen/.ssh/id_unifi\n * Known gpg key: 06E4ED455EDC3E3F6AA59BF58B31FB567A61439​‌​\n4\n\n                                                         \n   ~/Projects/zsh/zselect                               \n   >....                                              \n    ballot_pair2 \"$'\\u2610' $'\\u2611'\" # ☐ ☑             \n  )                                                      \n  nerdfonts=(                                            \n    ballot_pair1 \"\\  $'\\u2714'\"          #   ✔           \n    ballot_pair2 \"$'\\uf630' $'\\uf631'\"   #             \n    ballot_pair3 \"$'\\uf62f' $'\\uf632'\"   #             \n    ballot_pair4 \"$'\\uf93c' $'\\uf93d'\"   # 祿 綠         \n  )                                                      \n  if [[ -n $1 ]]; then                                   \n    print -l \"Select pair with 'zstyle :zselect:ui:elemen​‌​\nts:ballot pair \\#'\" \\                                    \n             \"To select from nerdfonts set ':zselect:ui:e​‌​\nlements:ballot nf' to on\"                                \n    print -f '\\n%s\\n' \"Standard:\"                        \n    print -f '  %s  %s\\n' ${(Qkv)standard}               \n    print -f '\\n%s\\n' \"Nerdfonts:\"                       \n    print -f '  %s  %s\\n' ${(Qkv)nerdfonts}              \n    return                                               \n  fi                                                     \n  if zstyle -T :zselect:ui:elements:user ballot; then    \n    if zstyle -T :zselect:ui:elements:ballot pair; then  \n      pair=2                                             \n    else                                                 \n      zstyle -s :zselect:ui:elements:ballot pair pair    \n    fi                                                   \n    if zstyle -t :zselect:ui:elements:ballot nf; then    \n      zselect_ballot=(${(Q)=nerdfonts[pair$pair]})       \n    else                                                 \n      zselect_ballot=(${(Q)=standard[pair$pair]})        \n    fi                                                   \n  else                                                   \n    zstyle -a :zselect:ui:elements:user ballot zselect_ba​‌​\nllot                                                     \n  fi                                                     \n  print $zselect_ballot                                  \n}                                                        \n                                                         \n   ~/Projects/zsh/zselect  \n   _zselect_ballot \"hello\"\n                                                         \n   ~/Projects/zsh/zselect                               \n   _zselect_styles \"hello\"                            \nSelect pair with 'zstyle :zselect:ui:elements:ballot pair​‌​\n #'                                                      \nTo select from nerdfonts set ':zselect:ui:elements:ballot​‌​\n nf' to on                                               \n\nStandard:                                                \n  ballot_pair1  [ ] [x]                                  \n  ballot_pair2  ☐ ☑                                      \n\nNerdfonts:                                               \n  ballot_pair1    ✔                                      \n  ballot_pair2                                         \n  ballot_pair3                                         \n  ballot_pair4  祿 綠                                    \n                                                         \n   ~/Projects/zsh/zselect                               \n   ls             phen   phen-MacBookAir   1:52   \ncandidates  zselect.sublime-project                      \nzselect     zselect.sublime-workspace                    \n                                                         \n   ~/Projects/zsh/zselect                               \n   ./zselect      phen   phen-MacBookAir   2:08   \n./zselect:bindkey:145: no such keymap `zselect'          \n                                                         \n   ~/Projects/zsh/zselect                               \n                  phen   phen-MacBookAir   2:08   ",
-			"settings":
-			{
-				"buffer_size": 4209,
-				"line_ending": "Unix",
-				"name": "Login Shell",
-				"scratch": true
 			}
 		}
 	],
@@ -230,6 +217,26 @@
 		"last_filter": "",
 		"selected_items":
 		[
+			[
+				"bas",
+				"Set Syntax: Bourne Again Shell (bash)"
+			],
+			[
+				"key",
+				"Preferences: Key Bindings"
+			],
+			[
+				"set",
+				"Set Syntax Settings"
+			],
+			[
+				"bash",
+				"Set Syntax: Bourne Again Shell (bash)"
+			],
+			[
+				"install",
+				"Package Control: Install Package"
+			],
 			[
 				"term",
 				"Terminus: Open Default Shell in Tab (View)"
@@ -301,10 +308,6 @@
 			[
 				"browse",
 				"Preferences: Browse Packages"
-			],
-			[
-				"install",
-				"Colorsublime: Uninstall Theme"
 			],
 			[
 				"themr",
@@ -424,15 +427,21 @@
 	"expanded_folders":
 	[
 		"/home/phen/Projects/zsh/zselect",
-		"/home/phen/Projects/zsh/zselect/candidates"
+		"/usr/share/zsh",
+		"/usr/share/zsh/functions",
+		"/usr/share/zsh/functions/Completion",
+		"/usr/share/zsh/functions/Completion/Base",
+		"/usr/share/zsh/functions/Completion/Zsh"
 	],
 	"file_history":
 	[
+		"/usr/share/zsh/functions/Completion/Base/_arguments",
+		"/usr/share/zsh/functions/Misc/tetriscurses",
+		"/home/phen/.cache/.fr-3SjCyk/installer.sh",
 		"/usr/share/zsh/functions/Misc/tetris",
 		"/usr/share/zsh/functions/Misc/sticky-note",
 		"/home/phen/.config/sublime-text-3/Packages/Material Theme/Material-Theme-Darker.sublime-theme",
 		"/home/phen/.config/sublime-text-3/Packages/srcery-sublime-master/Srcery.sublime-color-scheme",
-		"/usr/share/zsh/functions/Misc/tetriscurses",
 		"/home/phen/Projects/zsh/zselect/zselect_trim",
 		"/home/phen/Projects/zsh/zselect/zselect_curses",
 		"/home/phen/Projects/zsh/zselect/zselect_zle",
@@ -512,6 +521,7 @@
 		"height": 158.0,
 		"where_history":
 		[
+			""
 		]
 	},
 	"find_state":
@@ -519,6 +529,7 @@
 		"case_sensitive": false,
 		"find_history":
 		[
+			"list-choices",
 			"system_as_root",
 			"$system",
 			"$system_root",
@@ -562,7 +573,7 @@
 		"highlight": true,
 		"in_selection": false,
 		"preserve_case": false,
-		"regex": true,
+		"regex": false,
 		"replace_history":
 		[
 			"zselect_len",
@@ -586,7 +597,7 @@
 	"groups":
 	[
 		{
-			"selected": 2,
+			"selected": 1,
 			"sheets":
 			[
 				{
@@ -595,7 +606,7 @@
 					"semi_transient": false,
 					"settings":
 					{
-						"buffer_size": 5271,
+						"buffer_size": 7270,
 						"regions":
 						{
 						},
@@ -610,12 +621,13 @@
 						{
 							"SL.13.region_keys":
 							[
-								"SL.shellcheck.Highlights.|83c590e03fa44b71eed25a284ceaa1d79d6b98484674e0059b0c8d21f94a5d34|region.yellowish markup.warning.sublime_linter|32",
-								"sublime_linter.protected_regions",
-								"SL.shellcheck.Highlights.|f160a7fad6f90567a3fbb657a21115d417ecb2622224eaf48cc7488136a9d885|region.redish markup.error.sublime_linter|32",
 								"SL.shellcheck.Gutter.|region.redish markup.error.sublime_linter|dot",
-								"SL.shellcheck.Highlights.|468df606679ec3ee10281871300cbdab8c4d7801f7792fa3202c72e70cec2d5e|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Gutter.|region.yellowish markup.warning.sublime_linter|dot"
+								"SL.shellcheck.Highlights.|9701b67e260e4212884601bd934f16e3d03eb5e9531072ffba75b1eefae6565b|region.redish markup.error.sublime_linter|32",
+								"sublime_linter.protected_regions",
+								"SL.shellcheck.Highlights.|dbe214c910304592f3e3ab97c8d4761e6fc66d50752a3359f504b401f3260e3b|region.redish markup.error.sublime_linter|32",
+								"SL.shellcheck.Gutter.|region.yellowish markup.warning.sublime_linter|dot",
+								"SL.shellcheck.Highlights.|3c27677d8a7f9545be43aead2aedfbc9493ac21180e28e94cb60cc9b242ab75c|region.yellowish markup.warning.sublime_linter|32",
+								"SL.shellcheck.Highlights.|83c590e03fa44b71eed25a284ceaa1d79d6b98484674e0059b0c8d21f94a5d34|region.yellowish markup.warning.sublime_linter|32"
 							],
 							"SL.14.region_keys":
 							[
@@ -743,24 +755,24 @@
 								{
 									"1":
 									[
-										1854,
-										1855
+										2097,
+										2099
 									]
 								},
 								"icon":
 								{
 									"1":
 									[
-										"Packages/BracketHighlighter/icons/curly_bracket.png",
-										"region.purplish"
+										"Packages/BracketHighlighter/icons/dot.png",
+										"region.yellowish brackethighlighter.default"
 									]
 								},
 								"open":
 								{
 									"1":
 									[
-										1150,
-										1151
+										1806,
+										1808
 									]
 								},
 								"unmatched":
@@ -769,6 +781,41 @@
 							},
 							"bracket_highlighter.regions":
 							[
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
 								"bh_default",
 								"bh_default_center",
 								"bh_default_open",
@@ -784,46 +831,11 @@
 								"bh_round_open",
 								"bh_round_close",
 								"bh_round_content",
-								"bh_double_quote",
-								"bh_double_quote_center",
-								"bh_double_quote_open",
-								"bh_double_quote_close",
-								"bh_double_quote_content",
-								"bh_tag",
-								"bh_tag_center",
-								"bh_tag_open",
-								"bh_tag_close",
-								"bh_tag_content",
 								"bh_regex",
 								"bh_regex_center",
 								"bh_regex_open",
 								"bh_regex_close",
-								"bh_regex_content",
-								"bh_square",
-								"bh_square_center",
-								"bh_square_open",
-								"bh_square_close",
-								"bh_square_content",
-								"bh_curly",
-								"bh_curly_center",
-								"bh_curly_open",
-								"bh_curly_close",
-								"bh_curly_content",
-								"bh_single_quote",
-								"bh_single_quote_center",
-								"bh_single_quote_open",
-								"bh_single_quote_close",
-								"bh_single_quote_content",
-								"bh_angle",
-								"bh_angle_center",
-								"bh_angle_open",
-								"bh_angle_close",
-								"bh_angle_content",
-								"bh_c_define",
-								"bh_c_define_center",
-								"bh_c_define_open",
-								"bh_c_define_close",
-								"bh_c_define_content"
+								"bh_regex_content"
 							],
 							"syntax": "Packages/ShellScript/Bash.sublime-syntax"
 						},
@@ -831,7 +843,7 @@
 						"translation.y": 1533.0,
 						"zoom_level": 1.0
 					},
-					"stack_index": 3,
+					"stack_index": 1,
 					"type": "text"
 				},
 				{
@@ -840,27 +852,28 @@
 					"semi_transient": false,
 					"settings":
 					{
-						"buffer_size": 5271,
+						"buffer_size": 7270,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								1829,
-								1829
+								1318,
+								1318
 							]
 						],
 						"settings":
 						{
 							"SL.14.region_keys":
 							[
-								"SL.shellcheck.Highlights.|24d61f30ab569f1db97ffa5a380eb0dc12e43ba9524e754078ea37aa41b9db41|region.redish markup.error.sublime_linter|32",
-								"sublime_linter.protected_regions",
-								"SL.shellcheck.Highlights.|89a495e806f7d6d21038a79b245d1232c5941a2acad1fea37871bc28f0c3e500|region.yellowish markup.warning.sublime_linter|32",
+								"SL.shellcheck.Highlights.|be3e0b41015c6a26018633e13e9f29bd100571a494d84d77d6befa0a35ea3d21|region.redish markup.error.sublime_linter|32",
 								"SL.shellcheck.Gutter.|region.redish markup.error.sublime_linter|dot",
-								"SL.shellcheck.Highlights.|622b35ed609e8ea49bbdbf84c53b15a4807886fa54253595bf2657af13ee2239|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Gutter.|region.yellowish markup.warning.sublime_linter|dot"
+								"SL.shellcheck.Highlights.|443fac50d0a4679f8e17690348cb4326fbb4e3729b679c0ec4404a2e8ef2b6ef|region.yellowish markup.warning.sublime_linter|32",
+								"sublime_linter.protected_regions",
+								"SL.shellcheck.Highlights.|f7528125bc8ae70f06ef0e6b203395b12a9c5c4aeaf898515f32b8cccf1c0d8a|region.redish markup.error.sublime_linter|32",
+								"SL.shellcheck.Gutter.|region.yellowish markup.warning.sublime_linter|dot",
+								"SL.shellcheck.Highlights.|622b35ed609e8ea49bbdbf84c53b15a4807886fa54253595bf2657af13ee2239|region.yellowish markup.warning.sublime_linter|32"
 							],
 							"SL.19.region_keys":
 							[
@@ -877,451 +890,27 @@
 							{
 								"close":
 								{
-								},
-								"icon":
-								{
-								},
-								"open":
-								{
-								},
-								"unmatched":
-								{
 									"1":
 									[
-										3351,
-										3352
-									]
-								}
-							},
-							"bracket_highlighter.clone_regions":
-							[
-								"bh_default",
-								"bh_default_center",
-								"bh_default_open",
-								"bh_default_close",
-								"bh_default_content",
-								"bh_unmatched",
-								"bh_unmatched_center",
-								"bh_unmatched_open",
-								"bh_unmatched_close",
-								"bh_unmatched_content",
-								"bh_round",
-								"bh_round_center",
-								"bh_round_open",
-								"bh_round_close",
-								"bh_round_content",
-								"bh_double_quote",
-								"bh_double_quote_center",
-								"bh_double_quote_open",
-								"bh_double_quote_close",
-								"bh_double_quote_content",
-								"bh_tag",
-								"bh_tag_center",
-								"bh_tag_open",
-								"bh_tag_close",
-								"bh_tag_content",
-								"bh_regex",
-								"bh_regex_center",
-								"bh_regex_open",
-								"bh_regex_close",
-								"bh_regex_content",
-								"bh_square",
-								"bh_square_center",
-								"bh_square_open",
-								"bh_square_close",
-								"bh_square_content",
-								"bh_curly",
-								"bh_curly_center",
-								"bh_curly_open",
-								"bh_curly_close",
-								"bh_curly_content",
-								"bh_single_quote",
-								"bh_single_quote_center",
-								"bh_single_quote_open",
-								"bh_single_quote_close",
-								"bh_single_quote_content",
-								"bh_angle",
-								"bh_angle_center",
-								"bh_angle_open",
-								"bh_angle_close",
-								"bh_angle_content",
-								"bh_c_define",
-								"bh_c_define_center",
-								"bh_c_define_open",
-								"bh_c_define_close",
-								"bh_c_define_content"
-							],
-							"bracket_highlighter.locations":
-							{
-								"close":
-								{
-									"1":
-									[
-										1829,
-										1830
+										1801,
+										1803
 									]
 								},
 								"icon":
 								{
 									"1":
 									[
-										"Packages/BracketHighlighter/icons/square_bracket.png",
-										"region.bluish"
+										"Packages/BracketHighlighter/icons/dot.png",
+										"region.yellowish brackethighlighter.default"
 									]
 								},
 								"open":
 								{
 									"1":
 									[
-										1820,
-										1821
+										1546,
+										1548
 									]
-								},
-								"unmatched":
-								{
-								}
-							},
-							"bracket_highlighter.regions":
-							[
-								"bh_default",
-								"bh_default_center",
-								"bh_default_open",
-								"bh_default_close",
-								"bh_default_content",
-								"bh_unmatched",
-								"bh_unmatched_center",
-								"bh_unmatched_open",
-								"bh_unmatched_close",
-								"bh_unmatched_content",
-								"bh_round",
-								"bh_round_center",
-								"bh_round_open",
-								"bh_round_close",
-								"bh_round_content",
-								"bh_double_quote",
-								"bh_double_quote_center",
-								"bh_double_quote_open",
-								"bh_double_quote_close",
-								"bh_double_quote_content",
-								"bh_tag",
-								"bh_tag_center",
-								"bh_tag_open",
-								"bh_tag_close",
-								"bh_tag_content",
-								"bh_regex",
-								"bh_regex_center",
-								"bh_regex_open",
-								"bh_regex_close",
-								"bh_regex_content",
-								"bh_square",
-								"bh_square_center",
-								"bh_square_open",
-								"bh_square_close",
-								"bh_square_content",
-								"bh_curly",
-								"bh_curly_center",
-								"bh_curly_open",
-								"bh_curly_close",
-								"bh_curly_content",
-								"bh_single_quote",
-								"bh_single_quote_center",
-								"bh_single_quote_open",
-								"bh_single_quote_close",
-								"bh_single_quote_content",
-								"bh_angle",
-								"bh_angle_center",
-								"bh_angle_open",
-								"bh_angle_close",
-								"bh_angle_content",
-								"bh_c_define",
-								"bh_c_define_center",
-								"bh_c_define_open",
-								"bh_c_define_close",
-								"bh_c_define_content"
-							],
-							"syntax": "Packages/ShellScript/Bash.sublime-syntax"
-						},
-						"translation.x": 0.0,
-						"translation.y": 3175.0,
-						"zoom_level": 1.0
-					},
-					"stack_index": 1,
-					"type": "text"
-				},
-				{
-					"buffer": 2,
-					"file": "/home/phen/.cache/.fr-3SjCyk/installer.sh",
-					"semi_transient": false,
-					"settings":
-					{
-						"buffer_size": 40751,
-						"regions":
-						{
-						},
-						"selection":
-						[
-							[
-								14885,
-								14899
-							]
-						],
-						"settings":
-						{
-							"SL.16.region_keys":
-							[
-								"SL.shellcheck.Highlights.|c7b4a3441d164ab584b89d34bfd5b52699173331b15b86448537ef933ec2ab3c|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|a8c13475d386245a7849afb04cbf2aacf0776603bb4be1049848ae5cb672b8f3|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|ba7053b58b71de90ccfb1f2f2ffd8d1e3ed39ef350daec61a82859053b039c5b|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|2fcbeb4933a18c08dc62c036c12f3c616a850d69ffe132c8f78970bbcc715880|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|f8fcaa632d6219d07abb0d59f0d335514637bb88a7851ba3a8e41c5dc9a42044|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|ecd4a0e26a59cd0166ec6f4eb23f7dde79213280b8bbd3472a7a4b4bf2f32fd2|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|4bdd4375f3b565ea91513766f8390f357cf9873644245c74e041f44010bc703d|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|82eb61f88d18e442fbc2a4d916104daf29529e0fad03b8608492a8ab746f01aa|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|85309d62b14ce9c6dc067deb1623e18261766ca6d4d1a42cfa37c5c77c93eb33|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|67b6c7b7340e59fdba2995ec74929d5b183a4294c8be12eea82cecf7e3574a2b|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Gutter.|region.yellowish markup.warning.sublime_linter|dot",
-								"SL.shellcheck.Highlights.|89f31ac3337358277934582bcea3f09823b3c58a7b2bc4758645168d8ed7c125|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|347348121ea5ac4bd111752fa4c9fbc6bf10fcb2cb9ec55244aa798f8fdba972|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|6d1be2e68a68221e90fa8415425f068a53a7f3131efe6e9e59ffddbe4c3a334d|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|42bc8dc395094005273d6ecbc5ad0748b35b0b95146c28f6c2e4ac00365e76fa|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|01ac539143c04d4343e2435d018acf1a93561017c0a0c4f79d49e1d8afb6bccb|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|6ebd1371a84e59c278f3204c60e568722a40793384d3d66ee5227b46fa9019e9|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|5e6c520d1ced9d038c734d11b8688f5b79dbec1bf99e9dc8e80561e3ba687523|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|9f83c753d77a105cbef78b17f9b05c8c2653ef211159dc9f0cc113b4f4415669|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|ad382493afe005d0e873de93c8a1da0ac2aa2ad89cfeec84dd5e7ab0f1ffa30a|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|ffaf5b11fd3e795eb1b4341c600711c93641146d461e355614f3d87b3393ac74|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|a2f95af8436fe0e76027441534250e209e2e32afd3f0283a5b569ab000e38384|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|a19a57ea1858ba338d98352d44009b8856019b1ec6e4f123dfc68b33166ddb92|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|0b1c3024873d603d05f0cfe6bd8624672da143ff11bab11d1568a29be53c37f6|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|291fc5a4e4b3d293c2a791387c0134a4d0361c23c3c27b18fd7fac3cb6b2af41|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|647a6e64e42a0ed5c0a1d3f98e6c19ac604b82d5f1a720679610a0ef0500d378|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|de8c5090115475e962183ebc1729a9da0f53029283ff1afe219ae99b3f6bbf44|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|72a46e15b6a692c6739171792cdee2a5f9445e749490a2bf1f5559678fc921b5|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|118d569bdc07109d90a6be41ccfc9627011b18457539414602948c4d4bf01ade|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|72fef86737ece94d1d369cc96f2572b83b15517f56b08d3441ae184885bf3974|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|fea66e9cf43baa47bf5e66b4e32077f41d56a657d9c7477714e90ee00bc670f7|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|90e6b3cb6b0957536120566f7d8e1f6de5df23cf6966b1c65805a13f1f63c8aa|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|31c2f7c9af6d9ff77269a7303f93dcef77b8e47f2dd166da6f8ffb37e6cb9579|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|b093161283352177a6e4980181fe56d06e4f4613b697d2b618a95a4f07b0a3e1|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|9f0ea1f2a0794ae3019be778d84ca3875ecd154c2df194fab1e328d814ff3f0f|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|1b9a884c2bcd74e95797a2e205c6d7f0d1d6885c76792102adda521a7409c2b3|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|32cc204bc9feecb3363d47fd1bee2d2d9f9ad3d3242a9f915e1527907b869519|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|c60d248a70decd2630fd2992b6d68c29307b6a3d3f00d54cc42c301902fe0314|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|212b3d37a9fd9aef11f267a47fa464508cc715b4f56b71d263816bfb3abf4db3|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|70990f212fe07a0896c829c1ab5952f6f9888882f5b6e473b588cdd75eabd01e|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|eb57168e4d330cfecc83e6471ab6ec7d371705ead97cbcf9f374ba69c9904a89|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|968fab990290c7045836f75a6305045e4539f3caa9105dc5378b0e01e96ee393|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|994a1b2627d0e5f54da8c08b178e006e50dfd2da24279156e1d54044c063b7a9|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|f69d55d33d54644b44d48c7b40841c6835cf0175010331b8e2c6502b64a62529|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|180fe85eef7744cb2a41fae36dca0c4beaba2a056ac814eb25fec793c4ab564c|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|0a0b108b00b350cc8bb689d78b9e874294a7fdf396d8278bfac354c6f0e8d24a|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|49074d1ca0c16c664338b3147b4833f513a226e5a7b8384b62da26f1ccfac390|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|cee5c3cf73b2a442dfbbba627039fb94091b80a6b48d60f007276a6347bf54c1|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|a8212192756e557b0b0f2bf5d863c4fd3bc51be208f91d22f4e669f69182c0da|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|ed3f5adaae7b21dbd977df8f0ad0f2d222ed15193fc5da132b017ed9c1174cb3|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|6a74c7cacb089b6f26c8414b18a3ea97e29027874aec680ff52804c3c4085367|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|70e0f03f0a29b64ec3819a88de16a0691b77cef91c01e673d90d161cd8045645|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|b9ae75e0b49ed8bbf4d42bbf3f0b30fcfe224e7bb317ffdea6bf588311c99539|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|83ba519176bc0c382754af7fe519ebbab466838baaba25b6980de614223ed6b4|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|73660cd56706338f76245f572715f9d7ad52ef2c4ad79226b6e87a210a9fa80a|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|3ef398e81f86c255af7ab335be0e64877d34ebca7b29c33c7dfdfe6cff456717|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|0e8fd6e5ad90d5c10728ba678a877546b91d5f57d3a0ea2e9accb2af51aed80a|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|aa858a223df2cd9819d4c62a8b6f598c55c712219f2c5a4f9fe01231e4df7436|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|99be3c43bdcb1fb9e8db280ae67fab910c82eb6b2133f5bf32149d01a5432912|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|7c6ef100183528fc7ba76608d9c3cc167f73dbc044878b289869bebe1eec0fe3|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|7f8f7a2cd755181ac1ab2e4f467a9bf84da7a850710e32064cfee00d09aa847e|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|97f7216868d3ee33968ad3672c040501be7efda4f08c5a4b050e377e9c4ebb3e|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|ef98fbbd249545a4d98bc97e417ba490e2f78e41ea608b65397179df67a3c013|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|93d73e133363adf9b03b0a2db106d7e533bf33ded5ca0375ed75f7bf59c3786b|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|5d54c63ba26a7261ffc4daee708dcc80796c5de94c9b1131683820cbff98619a|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|25ded790ed4502be77765e5c350ccaa51bd75a3ce2267793374a7bf371471b9f|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|9c1aa8c100cb0c5c67d805b457d7cd7aa2084ff73afa2a5b6661deb629b728d1|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|5d45f9c69ad971e25b95f8bfde19aae62d55a342500dbb878ad878ac0d4aaf69|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|07f364e5593014c8778ce5beeb8f636e205bcfe20f3f0a6fc9621cb60aa4333b|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|aa6a9890756e9e6e6f82fddc2c89633520867faada65840e81a2c573a2e81074|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|2550d0d7242556e286862e8c293f2f7b192b0eb75ce03728ed776fa29125fb91|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|e08ddfe2fbeeb62d6f6df5f360a3503ba904032ccc5290986436c00a17f9406e|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|cf4e6c0ea9fb0e1f71fb61fca8cee9a10c3a4682063937aaa93261c163ba72cf|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|e4d6585620868f15b9f05d2d863160c15edaa2a44613363470696d7e7045563c|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|dce5d5ebb2eb320239911af78b85c12a9f681a95cba732fb9eba0743858fa2df|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|a50ab2f2b21aa81906eacd72bda3e9a1e8b63e12c5e8cb37674fd94e216e3a34|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|15a01861f1c10a2822b431842b8086e1eeeff32a8be6921cec9614b44ca36c9f|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|782fe2ec9e598a10aa754f130887ca21620e7a8d2bb163e1c4692122607d5123|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|ebd8890f1877771fda955c13a05300df637d704983efb02087f573a9718eba7d|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|3c58f8b58e82dccdbc8212b7b99f169e1a9f2de266aec738b7083b8966bd3477|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|e2aa8e52806fa1a047c381f1dc5f90d54ba81c2c4e522f39e8fce80b0c697064|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|5a85cd659ba7ea7076689544dd3a866fd7341cbf3eaf95ed3b0b93c98fdca2b0|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|d1047a62cafd0f6580a009176d0aca5ec22de88590a6ee9ec967d3dc27ed3acd|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|8772402fff8ce5d4102d006bbd120ecb2ed07d95724ec823f002e1921c909505|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|59a6c4de62e88d5c86b51f1b454969c29493fbd26064fec07fb07ff18848c9e6|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|8982e78893e68bb4cbd6c93891480c456332b88417cdedb50a5bd38cac810126|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|bb79175e81528c81675f8c99a4161e69f0fcdf683d7cfd59258fa2e6d7210933|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|1c7114962c70c9867ae844d3b8513cb892fa6870b67480e374d5ae3c4d92c0c7|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|5661d76fc40741ba57581416d3aecbd9fbaf3d8487a4ff8037507a85264d34a7|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|a1bf9bb6b9f65a14201e2a18a70b82588bd9118f585606d4e13ce9c6a7f4a81b|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|67252092d6e3b19b5a4cc95405f76c560ea3bbb6964ec82c6309db1f498600e4|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|8e9e2b6b34b4898ae75b8dbfcf3d7d0cb75d5b7b710636d165df7d3649e92acd|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|30166d6009b8634eb56d0d36d7e7d0023c4aea758ca1a9f069666c0534bc7940|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|6992cdf4de9437aa9750eaa3e727653c6b0a5b98ef089f297cd406d1f34dd436|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|bcae1dff95f9afeaaef5c7bbe26bf56efbb7faad74e7db10a68178a8ca1f33b8|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|f84fdfaa9f59bae1a2e636452a31a3b4c229d72c2c103cd9b708aa8da43c43c1|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|682aa85ede8b7e19924c508f124568568765b875057e6d7181133661ba2b75e5|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|3ece9863eedd13108fb74d54a9cec08ff7c352cd9eadef6454913eb1dbe68f18|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|f3e36a470817d0452c7a5c2c57a94e8ae94748182ba51e1ea2f598ad342033f0|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|f89b0b51ca3a6b17436e4ec868c78ed3d9c8cb98043f188397088990b5153a9f|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|f85408a14e31c425bf837e98029890d0b6c0eb77ccd3c31b88e1ab5d4de0a3cb|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|e499ea0fa0b9af59d03035e0b80b5c1a3becd4d46cd35881b7a4d7214b7f1c28|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|ad76fe9ffac617e5fe99bb468d2963d80057f2ae0018bf14a3d22fea5c99d98d|region.yellowish markup.warning.sublime_linter|32",
-								"sublime_linter.protected_regions",
-								"SL.shellcheck.Highlights.|5711bacdea6a3b65a40eeca3bbc2d60bae0676455d12c7c04ac1bd829ee2475e|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|222390e55f44ef1cf8137bafb57f9dc7d66fec3a434e91bfb1954be41513097a|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|acc85303b405698a52dc5a5fe49bfcad4d4381fe0307ab41122824aac5921b4d|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|bf5d140ecf13d683d8d25225706fd38b7126cfccaaad30872e40d095c4bcd912|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|fcc0dbd2642cc8fb492093e6cc1561c8de89d59bd7cb0ab8e84148bb1cce5027|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|341f032ab6782cbf2f83e126f90bcab7ade16e2c998ae5d561e0da4d328fbecf|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|7f80d0cf9284dfeeaefeb4f314f80567901a4fa3aef7aec4998f72eb2d4ca557|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|e6bc328fd28f0ec8bee3fdfd00923e9f2a8fdf150c8a6d4365a08fcbb60925a8|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|b7f3af425c4489a17f4b46422779e757e99c781a55571f39b694220fe3ab22d3|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|e0151225ac4fd58892757e66ad59cd597a1e02badd234e4c377ca26e7309261b|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|72cc3898df30166a6dcc64d2b35b42436ac891fb63edb0164e6690997faddba5|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|ab49281e547019af3ac2a053f0c94cece8f1106741755ebf5b8a37d0199ddb21|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|f4a45af624f10a215e6db43e91df2cfe928b8a9d0798e7200e5e1595deba2f32|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|3cac6d2d8ed7b7f91a63d32feea11a072ede480dc7caace14f664a9c45b75e69|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|7521113d4760550802b2f3660f746f487e91c07f63d76ab887cd5cb3a8281c61|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|53befd847f0fd71f057c4ab9cabe67eb7cfb9ed4eb42ffddbad164aab77bd862|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|c6d19cc5a1d2f3ea165d906a2988d4709174099cf11ae3f29dddb7df7c209052|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|a53fbae0238d2610b78fa19f741051b07dd7ecae5f354585ca1a409a36b7d469|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|acbe4017921a12c61a290bda0fcfee58bfaba2dc6beea49a180317cf0ac8582b|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|423b68519a87afde2ca9d7654931962e8d107fc057eea0c4e2a41d89e71db1e0|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|4252ca544990df42e7e48fbf2f586c13827bc1b246e9bcfbf7f4452b4e0d6199|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|c6e5e81c7a2761aa4df375b42f5d4d9acb457cb7288fd5360dcfb3bbf2bce43d|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|c6c2509fd3ff7cc001c51cb6414989e562dd564056acad54afaa036a47475eee|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|9a83e3c9a4a2900e990541930e1a1ce638e3c7d3bf60d7ecb18bc619b285eb2b|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|e6864264326df87b7d4a1666bef805e0a6157709201f63c0484b02785e574ede|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|d47bee852473db98a34d24adaf6ba0ea9232560f8f9328cf4923ac8d985030ce|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|595b8db62b61370db1e1041689b15287f0c6da389cce058e54439b207cfe9012|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|e37a825f9a607a90f4d4d2d9b1d4a42fb5b80caaa6bdffedc8b9562e7c03b533|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|234488d7f82d9deb055072838667cfbb436adab9e3d24480b4028dd93e1b365a|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|b2439bc7b8b711cfb18c099d5e7cb8f254ef5733393e42627a83f57a2d0eb09b|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|3172623b57d545b2da149fa66057dfc55a094b89cf29d230bf2d0c2adbba773f|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|e6502761535d102b06f0919eb29cc292a9d643acfbaf04df229578c2537f4ff9|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|baa3ea06fe6aa0c92f0b8e27488be26bc845ea47616be92b1ded783a01c1fcbd|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|55a7eabcff1a11b548c6c16534fe92a74bc08bdbf95caf57af32bf22519a3b82|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|ba4c9929fa7759b62b6a0c90a95a204405fb86f8d0d892d240601519474655a6|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|c471c4448e887522c5a007af07aa49e414724c247f0eed17174a4247c0a39060|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|26d32be2a335e0713576462429c608e6a4030c9ccf742f500f9eabb79d7d7374|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|1bd0bfc4eeb9265a184e94518109636779f05e567c8a29e6e651151d7f9cdda3|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|6572351a5f59172f88021111e0a2ff2f63b0c70cd05a055737e1776eb19111ff|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|3a70390e17dd1d932352adeaf20adf8094a9ebf01bb94b9d6483c0928c922e2a|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|39eb255845d4b07739a7b030d9f17cef28585d74a499137c3ea1797f29e8e1b3|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|8228d9a75fac0853012179a12acadbb5f5268598ace719f47af961b5431d229b|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|f2f334be1caf70e9cc803e0d882723612a65e473515d1cd2fc53db3507458e07|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|869bc53fcead9019fa90122e2fb1c49e67cb3a6d209f60eb0abea52502b7288a|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|014e6d2691c46f57a86fa0034f5ab00272db5ea2c5b5e310eafbbb5e7e6a144c|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|8518d2d1c3941abb363fcb926c7cc72037bf3eb576863dae048db27a36ef6fda|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|5261d3ce2cc9e88142f8efa1ffa2ec154c97de51b67f08c6f3d677f4fe1d32f1|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|4fa2e26f01c7231ca5d0533a853e8e9ed8ca44feb022d4458ff67f3f61d16c7c|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|c3f7a55077e332e688078e3bfba9c40693a68d62399df888c9d148e31175434c|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|325edc4cbbec9d6cafcfa17385db9ad2077647e28d784521a1b1db6eb5f1f759|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|68a5352613857639778a95f6becef42a9b2748c0e8ad7535859d6e64f0cd1bc6|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|6cc403b01e63f383cce5638dffbbd559e00d4532d67d0fb60e99f4c00244f059|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|77a67c01ecc0b3e5792c32fcd42fe5956a73cdb4cd8cc568d917959ee8bf8dc3|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|71602e9b46fb6dc1538cd5419e7da3cb52f2f881bbc179bdab5fd70b91b26053|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|0144f5202a06ba50f9b365f9d3b02835e139f58a2d2e3cce1cbc556634e8a806|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|912ab14ddffb3d8956b5cc066a605eafee2ecbe76188d4648ffc1becfa64d130|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|8a87951e629a34984664f44f6e1803c7328865c85cc1340d8dabb77773c9d05d|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|1babf5afe88c4b7a4728c3091a9fb11f67338abbaec026cac332237f174bb28d|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|96282b126a12daefee0f319c58ec1d1cac6dedff74b433c79990d563a05489f4|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|54e51d1f820f921b9da4f8e073f0a0c26167e1f328eb136677d2dbbbf47b9fba|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|ba7f1e131a6f74e677ed571c7286e3db3348a93315cf9d08dab68c04acf516bf|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|b3f69e079eadcb20502a23d1aa8691a549f4eaf6a18ec792d51118280a06dd94|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|227f007f1b3e1cf4cfd5ae8327027cbdb0d284edc59950d9ae3b4dc83db213c5|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|a0742ff4e91b1de75461201386501de5511ab46beaec238887709f3ca014aa68|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|5d01af4b174f21b6f084c88cf3949f3467b97dde37f3ee5998418b1da4f61c29|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|3d83276cfd4871003cb245ec234171e7aa0d011d9cccd4f39576aff9a365b1cd|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|2a9f1886c5611194029c71276c02b86655e43e23a70681cd2176ad8a33f12614|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|9a93f439033cf2605112d6ca594e19088e1a74836b6dd3a785101a783dfe7ec3|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|cb58cf383e467d97661fb974a96370271fe8224955f589dc7a97b1bbd28f866a|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|40f58bbdc25627373fffc020c833816fa4425c9741a90c4907f01e653441e0ee|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|eb9dd9e87eb3e6a23fdfc98eff2c6cc186b979e8ded9d7e170404bdad14413b5|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|84553c207223aa50e905cd180042e9f22206a56c3938c79a8769cee7b8c14618|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|f8103e75ef98fed4b1b3e097d14fb18b01482b987c9533d17269ef8f394b3fa7|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|07a215931582e38afdccf66fb42bfcadd31148f0ce371c8fac27d1f1f06af700|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|3adc373c0d26b0878800a7321ff343e7d033359d65c47a70d18a210d485f51bf|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|5c5f9cfcb3165bfa2efb88334c4de61e90ecd0bf3bc3518077e104bb7d7243eb|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|df5deb563b7c742c84844294068c17dd9b0643ed6ca789be276820811a982668|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|b77de51c232e980a7612b773001d51b4c83a4304a7dcde1375183c31f3a7810f|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|225b208c15000d3830f166d77770da5cb15388f7f23a1e725cee7526424aa63a|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|1277c7ccab8ae5896db5a79c453c0659d3a96216a6fb20143f728dd9bc76522c|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|7959d0bd532fc9c1ee3519f5ad9d065d0e3f518838d7451c09dc338f4a6c6575|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|782f9e987353d268ab36c1ece2db4713e1d15a46a6eab71450519153570e29c3|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|d25d797268dfd25e94da026ef9a0640485a5bc9dbc11d6897b0869141ab767da|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|7225e5f5919a1a60c205fc3d0c4c8b648ef6e964441eaaf7add3bb49e6048f6d|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|66f373d44a6602a69d0d8317ede3e8190baff8719b413d9f131def36eb763341|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|a301d7f389644570d4edb4dea3260774704b9bae50b92fc8dddba71b7f55746e|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|74938e706f4c269468cb1216b7c8c408611064cf5985d559c5c0f0821d62455d|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|d05e058ca1fa7eb87ec2191fce428ece9f75987e4470b56d29021c0797faea6e|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|8970a3c906e90bcc3cb6338fc0b4914bb065cfb339c61b8f0602cbe987c32313|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|f2e82920be593f94582f26a1c82a4d7f575ed69ae93e56aaad450540c150f4d6|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|c32cf6c70f8b74f3d2ad1671735986bb92f62aaf8c280712d72d78910fbbc93c|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|00a422617e1acf903237fcbc117336ad08a673e4da6b55b93c287ece53b57542|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|a8f7e2466674834fd9357c5f5a6fd72d14ed88d263e122ca48a1e6cf928670ec|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|55c191cf0a2f8dbc58db5e390edeabd09a10e43851ff99189406200e40344886|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|3eff82817e0b90afd98f57161b7ab361d3f75e9f6a92b52327e8c15f1590115c|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|ae96ae3d60eef176e26afc0fe86eb7c487ca4cfae8c875a64be6e66b4a9d35e5|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|89aa4ae8ae8e04e861139bfeba8327be508cea0d514f06f983d43c3ff33b5e96|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|4155da052e8dcfbe74eff28aa54503dcc74d1e5c8c01b77962556fe8214effe2|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|3e745dcf251ef56386a49e392358fe69d91b6c9a8e3d81950b30162da6a64fb7|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|e23831baf05cdcc82e27ac68a6bdcec93b2bdcceef30af56a406ac3c0a14d507|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|4e82fca6208ae5ea4c06d8a2b94dcc0238e75e9c53888f49c7c3486ff661b9ce|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|3096083432f7dc4fba1dbfd4efc7b35312aca75cc1daf1b737c405f155be9049|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|c0f59bcb82ec87fcb4d863445d2c86fc524e93e259fdfcd5f57fd65ad5c0ce83|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|7d02aec66dbde2921ba9e5ae448d0816e029d43b127f173ab55a57d88897b51b|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|ad7ff3ce3d44a0cb11576fd0705ef7f4c4faa278c253b014752b97908da5487c|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|709d95935e9d3857efa2c7d79b42f596337cccfaeea9f9d530d27ec3479993c2|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|3e2189906e6787cf7851960f55397d36577c36f982f880e7e0a01432059dbc83|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|b43d869250364868e00a21c92be9a0acae9e4a5f3d610016aa0e14be22897a38|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|01937cdfdb2b3d9ddca72b53a2ac53fd0e9969c1066ca10549cf3ae12ce9dfa2|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|158e82db0c26256fd3c8927db0db08403a54a5e7c8e40766518f6d36a83db627|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|57055ae1f4999d35f973939a239a515bc2dfac77be84adc75f757d946f12d92e|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|16fadcc301a8fdeb4e9d3deb569eff98ecf4520b17e74529c0f27b9bc5284aa7|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|b4cb836b1dcc1e86fbc0c94550a2389f542297637ed75b73a6b1d667e68d8aee|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|3355d67c1296a1f4109e458627732195e763512b57005695358a57f66ea45901|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|111f6ffa03dea039e615cf0aa4dda0c2f387ae2b0a48ce80b9ff34b86e3173d3|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|ddda19c9436f445cb7776da19d07f9f600b5bdaac099016d2c7c83792f12b391|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|7643a0e09b6ed14ca9b135c384e11651fe8e6d041474b8791883b8f38a5e8a27|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|42876c7158fab47dbea182e9e833cef6ad5226dbf5cde4a0b9bc35e266cfffcb|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|1c10a0b1ac1bd43c59ce8a89690bb1e415e7d0f395d6c527433ec4a015201b7e|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|a5a6ab6c92f0777d46a9106eb05160144963a9667bdd18f5305728cd4f317a57|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|44747c07b4931a1a0bd080012e52e5e3f4f53939bc7b9bc565a81d9ef3187126|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|9efbcb9637df02813740e007176eb8796115feb226b4c849090b04ef8761e4c8|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|9a420a0112ecdafbad89bcb10a5f978331f7836ce1612b385a3af88d49c6b363|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|c058ed24171fbb07074a210e3ffdb7abdf90a0f72b76148fccbb378570a906e6|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|4f98593a8ac601288627445a7f08f511d9321f26d7ea46c61055dff6d5e76be8|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|4da6326b86690d5be5b5224c9f181589ad789ea877bb1fc1e5549578051c9530|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|e40429369345cbc464e7af11274604388fab76c7a30e21087b70d8363b269b2a|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|7772671d4ff9a30a288c30f970d7667c36a3191799d84526b054754489ac1d0e|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|d33e3b2dd7cae58009eaa5bc2706d73d2f77068432da9b8562ad827e34ad7f39|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|090f14f816817092c665e279bd4b963c26a98502a2b5d0039f16239ea4b965c3|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|8b859856435227c68d4212bf57d7c25f2f35f4e24b36e22fd875d8272c3af57e|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|84d3e24232a00b6231d7b1df222008b3bdae0ebe116bad601b05566caad010fe|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|b348a548ed3d4e9eb5a737d2e844aff6ff7a47091b97c51ab26907ecf842e92e|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|20115475c5000dfb6bc0f233930c89766dbbf8c1414ae8076b169dc92e5742aa|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|f85b2a814807c10dd04593339c8d462020595cd4d59c9e1ccdb2a73b694d248d|region.yellowish markup.warning.sublime_linter|32",
-								"SL.shellcheck.Highlights.|d6224dfa88e09071c6c529a39e876c9102bdb0e589d1475db20299d0b07b71f6|region.yellowish markup.warning.sublime_linter|32"
-							],
-							"bracket_highlighter.busy": false,
-							"bracket_highlighter.clone": -1,
-							"bracket_highlighter.clone_locations":
-							{
-								"close":
-								{
-								},
-								"icon":
-								{
-								},
-								"open":
-								{
 								},
 								"unmatched":
 								{
@@ -1334,41 +923,36 @@
 								"bh_c_define_open",
 								"bh_c_define_close",
 								"bh_c_define_content",
-								"bh_regex",
-								"bh_regex_center",
-								"bh_regex_open",
-								"bh_regex_close",
-								"bh_regex_content",
-								"bh_single_quote",
-								"bh_single_quote_center",
-								"bh_single_quote_open",
-								"bh_single_quote_close",
-								"bh_single_quote_content",
-								"bh_curly",
-								"bh_curly_center",
-								"bh_curly_open",
-								"bh_curly_close",
-								"bh_curly_content",
-								"bh_double_quote",
-								"bh_double_quote_center",
-								"bh_double_quote_open",
-								"bh_double_quote_close",
-								"bh_double_quote_content",
-								"bh_tag",
-								"bh_tag_center",
-								"bh_tag_open",
-								"bh_tag_close",
-								"bh_tag_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content",
 								"bh_angle",
 								"bh_angle_center",
 								"bh_angle_open",
 								"bh_angle_close",
 								"bh_angle_content",
-								"bh_round",
-								"bh_round_center",
-								"bh_round_open",
-								"bh_round_close",
-								"bh_round_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
 								"bh_default",
 								"bh_default_center",
 								"bh_default_open",
@@ -1379,11 +963,16 @@
 								"bh_unmatched_open",
 								"bh_unmatched_close",
 								"bh_unmatched_content",
-								"bh_square",
-								"bh_square_center",
-								"bh_square_open",
-								"bh_square_close",
-								"bh_square_content"
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content"
 							],
 							"bracket_highlighter.locations":
 							{
@@ -1391,24 +980,24 @@
 								{
 									"1":
 									[
-										14899,
-										14900
+										1386,
+										1388
 									]
 								},
 								"icon":
 								{
 									"1":
 									[
-										"Packages/BracketHighlighter/icons/double_quote.png",
-										"region.greenish"
+										"Packages/BracketHighlighter/icons/dot.png",
+										"region.yellowish brackethighlighter.default"
 									]
 								},
 								"open":
 								{
 									"1":
 									[
-										14883,
-										14884
+										1103,
+										1105
 									]
 								},
 								"unmatched":
@@ -1422,41 +1011,36 @@
 								"bh_c_define_open",
 								"bh_c_define_close",
 								"bh_c_define_content",
-								"bh_regex",
-								"bh_regex_center",
-								"bh_regex_open",
-								"bh_regex_close",
-								"bh_regex_content",
-								"bh_single_quote",
-								"bh_single_quote_center",
-								"bh_single_quote_open",
-								"bh_single_quote_close",
-								"bh_single_quote_content",
-								"bh_curly",
-								"bh_curly_center",
-								"bh_curly_open",
-								"bh_curly_close",
-								"bh_curly_content",
-								"bh_double_quote",
-								"bh_double_quote_center",
-								"bh_double_quote_open",
-								"bh_double_quote_close",
-								"bh_double_quote_content",
-								"bh_tag",
-								"bh_tag_center",
-								"bh_tag_open",
-								"bh_tag_close",
-								"bh_tag_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content",
 								"bh_angle",
 								"bh_angle_center",
 								"bh_angle_open",
 								"bh_angle_close",
 								"bh_angle_content",
-								"bh_round",
-								"bh_round_center",
-								"bh_round_open",
-								"bh_round_close",
-								"bh_round_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
 								"bh_default",
 								"bh_default_center",
 								"bh_default_open",
@@ -1467,104 +1051,24 @@
 								"bh_unmatched_open",
 								"bh_unmatched_close",
 								"bh_unmatched_content",
-								"bh_square",
-								"bh_square_center",
-								"bh_square_open",
-								"bh_square_close",
-								"bh_square_content"
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content"
 							],
 							"syntax": "Packages/ShellScript/Bash.sublime-syntax"
 						},
-						"translation.x": 0.0,
-						"translation.y": 6460.0,
+						"translation.x": 2.0,
+						"translation.y": 4316.0,
 						"zoom_level": 1.0
 					},
 					"stack_index": 0,
-					"type": "text"
-				},
-				{
-					"buffer": 3,
-					"semi_transient": false,
-					"settings":
-					{
-						"buffer_size": 4209,
-						"regions":
-						{
-						},
-						"selection":
-						[
-							[
-								4158,
-								4158
-							]
-						],
-						"settings":
-						{
-							"__vi_external_disable": true,
-							"auto_complete": false,
-							"auto_complete_commit_on_tab": false,
-							"bracket_highlighter.busy": false,
-							"bracket_highlighter.clone": -1,
-							"bracket_highlighter.clone_locations":
-							{
-							},
-							"bracket_highlighter.ignore": true,
-							"color_scheme": "Terminus.sublime-color-scheme",
-							"default_dir": "/home/phen/Projects/zsh/zselect",
-							"draw_centered": false,
-							"draw_indent_guides": false,
-							"draw_unicode_white_space": false,
-							"draw_white_space": "none",
-							"gutter": false,
-							"highlight_line": false,
-							"is_widget": true,
-							"result_base_dir": "/home/phen/Projects/zsh/zselect",
-							"result_file_regex": null,
-							"result_line_regex": null,
-							"scroll_past_end": true,
-							"syntax": "Packages/Text/Plain text.tmLanguage",
-							"terminus.highlight_counter": 706,
-							"terminus_view": true,
-							"terminus_view.args":
-							{
-								"auto_close": true,
-								"cancellable": false,
-								"cmd":
-								[
-									"/usr/bin/zsh",
-									"-i",
-									"-l"
-								],
-								"config_name": "Login Shell",
-								"cwd": "/home/phen/Projects/zsh/zselect",
-								"env":
-								{
-									"LANG": "en_US.UTF-8",
-									"TERM": "linux",
-									"TERMINUS_SUBLIME": "1",
-									"TERM_PROGRAM": "Terminus-Sublime"
-								},
-								"file_regex": null,
-								"line_regex": null,
-								"panel_name": null,
-								"tag": null,
-								"timeit": false,
-								"title": null
-							},
-							"terminus_view.cancellable": false,
-							"terminus_view.key.ctrl+k": true,
-							"terminus_view.key.ctrl+p": true,
-							"terminus_view.natural_keyboard": true,
-							"terminus_view.panel_name": null,
-							"terminus_view.tag": null,
-							"terminus_view.viewport_y": 900.0,
-							"word_wrap": false
-						},
-						"translation.x": 0.0,
-						"translation.y": 900.0,
-						"zoom_level": 1.0
-					},
-					"stack_index": 2,
 					"type": "text"
 				}
 			]
@@ -1664,12 +1168,12 @@
 	},
 	"select_symbol":
 	{
-		"height": 0.0,
+		"height": 345.0,
 		"last_filter": "",
 		"selected_items":
 		[
 		],
-		"width": 0.0
+		"width": 580.0
 	},
 	"selected_group": 0,
 	"settings":

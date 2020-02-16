@@ -1,1 +1,289 @@
-candidates/zselect_zle
+#!/usr/bin/env -S zsh -fi
+
+emulate -LR zsh
+setopt noglobalrcs
+
+zle -N _zselect
+_zselect() {
+  emulate -L zsh
+  zle -K zselect
+  _zselect-timeout
+}
+
+zle -N _zselect-timeout
+_zselect-timeout() {
+  emulate -L zsh
+  _zselect-choices
+}
+
+zle -N _zselect-prev
+_zselect-prev() {
+  emulate -L zsh
+  if (( zselect_pos > 1)) ((zselect_pos--))
+  _zselect-choices
+}
+
+zle -N _zselect-next
+_zselect-next() {
+  emulate -L zsh
+  if (( zselect_pos < zselect_len )) ((zselect_pos++))
+  _zselect-choices
+}
+
+zle -N _zselect-uprow
+_zselect-uprow() {
+  emulate -L zsh
+  if (( zselect_pos-zselect_columns > 0 )) ((zselect_pos-=zselect_columns))
+  _zselect-choices
+}
+
+zle -N _zselect-downrow
+_zselect-downrow() {
+  emulate -L zsh
+  if (( zselect_pos/zselect_columns+(zselect_pos%zselect_columns?1:0) \
+    != zselect_len/zselect_columns+(zselect_len%zselect_columns?1:0))); then
+    if (( zselect_pos+zselect_columns > zselect_len )); then
+      ((zselect_pos=zselect_len))
+    else
+      ((zselect_pos+=zselect_columns))
+    fi
+  fi
+  _zselect-choices
+}
+
+zle -N _zselect-enter
+_zselect-enter() {
+  emulate -L zsh
+  if [[ -n $zselect_single ]] || (( zselect_pos == zselect_len )); then
+    ((zselect_finish=1))
+    BUFFER=
+    zle -U Z
+  fi
+  zselect_sel[$zselect_pos]=$[zselect_sel[zselect_pos] ^ 1]
+  _zselect-choices
+}
+
+zle -N _zselect-quit
+_zselect-quit() {
+  emulate -L zsh
+  local zselect_buffer=()
+  if ((zselect_finish)); then
+    for (( i=1; i<zselect_len; i++)); do
+      if (( zselect_sel[i] )); then
+        zselect_buffer+=("$zselect_elmnts[$i]")
+      fi
+    done
+    BUFFER="${(@)zselect_buffer}"
+    zle -R
+    zle accept-line
+    return 0
+  else
+    BUFFER=
+    return 1
+  fi
+}
+
+_zselect-choices() {
+  emulate -L zsh
+  local zselect_buffer=() join=()
+  if [[ "$zselect_view" == list ]]; then
+    join=($'\n')
+  else
+    join=($'\t' $'\n')
+  fi
+  if [[ -n $zselect_single ]]; then
+    zselect_buffer=("${(@)zselect_elmnts}")
+  else
+    for ((i=1; i<zselect_len; i++)); do
+      zselect_buffer+=("$zselect_ballot[((zselect_sel[i] ^ 1 + 1))] $zselect_elmnts[$i]$join[((i%${zselect_columns:-i+1}?1:2))]")
+    done
+    zselect_buffer+=("Done")
+  fi
+  if (( zselect_pos > 1 )); then
+    LBUFFER="${(j::)zselect_buffer[1,((zselect_pos-1))]}"
+    RBUFFER="${(j::)zselect_buffer[$zselect_pos,$zselect_len]}"
+    BUFFER=$LBUFFER$RBUFFER
+  else
+    LBUFFER=
+    RBUFFER="${(j::)zselect_buffer}"
+    BUFFER=$LBUFFER$RBUFFER
+  fi
+  region_highlight=("0 $[$#BUFFER] ${(j:,:)zselect_highlight[choices]}" "$CURSOR $[CURSOR+$#zselect_buffer[zselect_pos]-(zselect_pos%zselect_len?1:0)] ${(j:,:)zselect_highlight[selected]}")
+  zle -R
+  zle -U Z
+}
+
+_zselect_styles() {
+  local -A nerdfonts
+  local -a selected
+  local pair sc cc
+  nerdfonts=(
+    ballot_pair1 "\  $'\u2714'"          #   ✔
+    ballot_pair2 "$'\uf630' $'\uf631'"   #  
+    ballot_pair3 "$'\uf62f' $'\uf632'"   #  
+    ballot_pair4 "$'\uf93c' $'\uf93d'"   # 祿 綠
+  )
+  selected=(standout underline bold)
+  if zstyle -T :zselect:ui:elements:user ballot; then
+    if zstyle -t :zselect:ui:elements:ballot nf; then
+      if zstyle -T :zselect:ui:elements:ballot pair; then
+        pair=1
+      else
+        zstyle -s :zselect:ui:elements:ballot pair pair
+      fi
+      zselect_ballot=("${(@Oa)${(Q)=nerdfonts[ballot_pair$pair]}}")
+    else
+      if zmodload zsh/langinfo && [[ $langinfo[CODESET] = UTF-8 ]]; then
+        zselect_ballot=($'\u2611' $'\u2610')
+      else
+        zselect_ballot=("[x]" "[ ]")
+      fi
+    fi
+  else
+    zstyle -a :zselect:ui:elements:user ballot zselect_ballot
+  fi
+  zstyle -s :zselect:ui:highlight selected sc
+  zstyle -s :zselect:ui:highlight choices cc
+  zselect_highlight[selected]="${sc:-standout}"
+  cc="${cc:-bold}"
+  if [[ $sc =~ bold ]]; then
+    cc="${${cc/bold/}/,,/,}"
+  fi
+  zselect_highlight[choices]="$cc"
+  ((zselect_main = 1))
+}
+
+_zselect_options() {
+  emulate -L zsh
+  setopt extendedglob
+  if (( ${opts[(I)--ballots]} )); then
+    print -l "Select pair with 'zstyle :zselect:ui:elements:ballot pair \#'" \
+             "To select from nerdfonts set ':zselect:ui:elements:ballot nf' to on"
+    print -f '\n%s\n' "Standard:"
+    print -f '  %s  %s\n' ${(Qkv)standard}
+    print -f '\n%s\n' "Nerdfonts:"
+    print -f '  %s  %s\n' ${(Qkv)nerdfonts}
+    return
+  fi
+  if (( ${opts[(I)-s]} )) zselect_single=single
+  case ${opts[((${opts[(I)-l]}>${opts[(I)-c*]}?${opts[(I)-l]}:${opts[(I)-c*]}))]} in
+    (-l)
+      zselect_view=list
+    ;;
+    (-c[0-9]##)
+      zselect_view=columns
+      zselect_columns=${${${opts[${opts[(I)-c*]}]}[3,-1]}:-5}
+      if ((${opts[(I)-o]})); then
+        zselect_order=across
+      else
+        zselect_order=down
+      fi
+    ;;
+    *)
+      zselect_view=standard
+    ;;
+  esac
+  if [[ -n $zselect_reply[2] ]]; then
+    zselect_reply="${zselect_reply[2]}"
+  else
+    zselect_reply="reply"
+  fi
+  typeset -ga "$zselect_reply"
+}
+
+local -a opts optstr
+zparseopts -D -E \
+  a:=zselect_reply c::=opts s=opts l=opts o=opts -ballots=opts
+if (( ${opts[(I)-c*]} )); then
+  optstr=${opts[((${opts[(I)-c*]}))]/-c/}
+  if [[ $optstr =~ [[:digit:]][[:alpha:]] ]]; then
+    ArgInvalid=ArgInvalid
+  else
+    if [[ $optstr =~ [[:alpha:]] ]]; then
+      set -- "$optstr" "$@"
+      opts[(I)-c*]="-c"
+    fi
+  fi
+fi
+_zselect_options && {
+  autoload -Uz throw catch
+  (( $# )) || throw ArgNone
+  (( $#ArgInvalid )) && throw ArgInvalid
+  zmodload -i zsh/zutil || throw ModUndef
+
+  local -a zselect_elmnts zselect_sel zselect_ballot
+  local -A zselect_highlight
+  local -i zselect_pos zselect_len zselect_finish zselect_main
+  _zselect_styles
+  zselect_elmnts=("$@")
+  repeat $#; do
+    zselect_sel+=(0)
+  done
+  ((zselect_pos=1))
+  ((zselect_len=#+1))
+  ((zselect_finish=0))
+
+  bindkey -N zselect
+  bindkey -R -M zselect '\000-\377' _zselect-timeout
+  for (( i=256; i--; )); do
+    bindkey -M zselect 'Z\'$(([##8]i)) _zselect-timeout
+  done
+  case $zselect_view in
+    (list)
+      bindkey -M zselect "Z^[OA" _zselect-prev
+      bindkey -M zselect "Z^[[A" _zselect-prev
+      bindkey -M zselect "Z^[OB" _zselect-next
+      bindkey -M zselect "Z^[[B" _zselect-next
+    ;;
+    (columns)
+      bindkey -M zselect "Z^[OA" _zselect-uprow
+      bindkey -M zselect "Z^[[A" _zselect-uprow
+      bindkey -M zselect "Z^[OB" _zselect-downrow
+      bindkey -M zselect "Z^[[B" _zselect-downrow
+      bindkey -M zselect "Z^[OD" _zselect-prev
+      bindkey -M zselect "Z^[[D" _zselect-prev
+      bindkey -M zselect "Z^[OC" _zselect-next
+      bindkey -M zselect "Z^[[C" _zselect-next
+    ;;
+    *)
+      bindkey -M zselect "Z^[OD" _zselect-prev
+      bindkey -M zselect "Z^[[D" _zselect-prev
+      bindkey -M zselect "Z^[OC" _zselect-next
+      bindkey -M zselect "Z^[[C" _zselect-next
+    ;;
+  esac
+  bindkey -M zselect "Z^[[Z" _zselect-prev
+  bindkey -M zselect "Z\011" _zselect-next
+  bindkey -M zselect "Z^M"   _zselect-enter
+  bindkey -M zselect "ZZ"    _zselect-quit
+  bindkey -M zselect "Z^C"   _zselect-quit
+  bindkey -M zselect "Z^["   _zselect-quit
+  echoti civis
+  vared -i _zselect "$zselect_reply" && { echoti cuu1; echoti ed; }
+} always {
+  if catch '*'; then
+    case $CAUGHT in
+      (ArgNone)
+        print -u2 "Not enough arguments"
+        ;;
+      (ArgInvalid)
+        print -u2 "Invalid argument for -c"
+        ;;
+      (ModUndef)
+        print -u2 "Could not load zsh/ztuil module"
+        ;;
+      (*)
+        print -u2 "Uncaught error"
+        ;;
+    esac
+    return
+  fi
+  # cleanup
+  bindkey -D zselect
+  foreach zselect_widget in ${widgets[(I)_*zselect*]}; do
+    zle -D $zselect_widget
+  done
+  unfunction ${functions[(I)_*zselect*]}
+  unset ${"${(f)$(<<(typeset -m "zselect*"))}"/=*/}
+  echoti cnorm
+}
