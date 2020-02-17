@@ -1,0 +1,1 @@
+autoload -Uz zselect zselect_plugin_unload

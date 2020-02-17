@@ -17,6 +17,14 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>
 
+{
+  0="${${ZERO:-${0:#$ZSH_ARGZERO}}:-${(%):-%N}}"
+  0="${${(M)0:#/*}:-$PWD/$0}"
+  _zselect="${0:h}/functions/zselect"
+  [[ -w ${_zselect} && ( ! -s ${_zselect}.zwc || "${_zselect}.zwc" -ot ${_zselect} ) ]] &&\
+    zcompile -Rz ${_zselect}
+} &!
+
 emulate -LR zsh
 setopt noglobalrcs
 
